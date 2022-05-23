@@ -22,6 +22,10 @@ class MyObject:
         if draggable:
             self.fields["handle"] = Handle()
     
+    def set_pos(self, p):
+        self.fields["rect"].x = p.x
+        self.fields["rect"].y = p.y
+    
     def __repr__(self):
         return f"{self.fields}"
 
@@ -36,9 +40,8 @@ class GameState:
         my_obj = MyObject(obj, **kwargs)
         if name is not None:
             self.named_objects[name] = my_obj
-        obj_id = len(self.object_handles)
         self.object_handles.append(my_obj)
-        return obj_id
+        return my_obj
 
     def try_pickup(self):
         for obj in self.object_handles:
@@ -84,8 +87,7 @@ class GameState:
                     if "handle" in o.fields and "rect" in o.fields:
                         o_rect = o.fields["rect"]
                         o_handle = o.fields["handle"]
-                        o_rect.x = self.mouse_pos.x - o_handle.grab_offset[0]
-                        o_rect.y = self.mouse_pos.y - o_handle.grab_offset[1]
+                        o.set_pos(self.mouse_pos - o_handle.grab_offset)
 
         screen.fill(black)
         for o in self.object_handles:
@@ -98,8 +100,7 @@ state.add_object(pygame.image.load("intro_ball.gif"), draggable=True)
 state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 200)), draggable=True)
 state.add_object(pygame.transform.scale(pygame.image.load("ranger_playing_board.jpg"), (200, 100)), draggable=True)
 
-state.object_handles[enemy_board].fields["rect"].x = 300
-state.object_handles[enemy_board].fields["rect"].y = 300
+enemy_board.set_pos(pygame.Vector2(300, 300))
 
 while 1:
     state.step()
