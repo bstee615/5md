@@ -18,13 +18,32 @@ class MyObject:
         self.fields = {}
         self.fields["object"] = obj
         if rect:
-            self.fields["rect"] = obj.get_rect()
+            if isinstance(obj, pygame.Surface):
+                self.fields["rect"] = obj.get_rect()
+            elif isinstance(obj, pygame.Rect):
+                self.fields["rect"] = obj
+            else:
+                raise NotImplementedError(type(obj))
         if draggable:
             self.fields["handle"] = Handle()
+        self.children = []
     
-    def set_pos(self, p):
+    def set_pos(self, p, touched=None):
+        if touched is None:
+            touched = set()
         self.fields["rect"].x = p.x
         self.fields["rect"].y = p.y
+        for ch, off in self.children:
+            if ch not in touched:
+                ch.set_pos(p + off, touched.union({self}))
+        if "parent" in self.fields:
+            p, p_off = self.fields["parent"]
+            p.set_pos(pygame.Vector2(self.fields["rect"].x, self.fields["rect"].y) - p_off, touched.union({self}))
+
+    def add_child(self, obj, offset):
+        obj.set_pos(pygame.Vector2(self.fields["rect"].x, self.fields["rect"].y) + offset)
+        self.children.append((obj, offset))
+        obj.fields["parent"] = (self, offset)
     
     def __repr__(self):
         return f"{self.fields}"
@@ -55,7 +74,7 @@ class GameState:
                 obj_handle.grabbed = True
 
     def drop(self):
-        enemy_rect = self.named_objects["enemy_board"].fields["rect"]
+        enemy_rect = enemy_board_playzone.fields["rect"]
         for o in self.object_handles:
             if "handle" in o.fields and "rect" in o.fields:
                 o_rect = o.fields["rect"]
@@ -91,16 +110,20 @@ class GameState:
 
         screen.fill(black)
         for o in self.object_handles:
-            screen.blit(o.fields["object"], o.fields["rect"])
+            if isinstance(o.fields["object"], pygame.Surface):
+                screen.blit(o.fields["object"], o.fields["rect"])
+            elif isinstance(o.fields["object"], pygame.Rect):
+                pygame.draw.rect(screen, "red", o.fields["rect"], width=5)
         pygame.display.flip()
 
 state = GameState()
-enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (400, 200)), name="enemy_board")
-state.add_object(pygame.image.load("intro_ball.gif"), draggable=True)
-state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 200)), draggable=True)
-state.add_object(pygame.transform.scale(pygame.image.load("ranger_playing_board.jpg"), (200, 100)), draggable=True)
+enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (400, 200)))
+king_card = state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 200)), draggable=True)
+king_card.add_child(state.add_object(pygame.transform.scale(pygame.image.load("ranger_playing_board.jpg"), (200, 100)), draggable=True), pygame.Vector2())
 
 enemy_board.set_pos(pygame.Vector2(300, 300))
+enemy_board_playzone = state.add_object(pygame.Rect(0, 0, 100, 100))
+enemy_board.add_child(enemy_board_playzone, pygame.Vector2(250, 50))
 
 while 1:
     state.step()
