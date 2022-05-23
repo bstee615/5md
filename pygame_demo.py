@@ -77,8 +77,7 @@ class GameState:
                     self.drop()
 
         state.update_mouse_pos()
-
-        screen.fill(black)
+        
         for o in self.object_handles:
             if "handle" in o.fields:
                 if o.fields["handle"].grabbed:
@@ -87,7 +86,9 @@ class GameState:
                         o_handle = o.fields["handle"]
                         o_rect.x = self.mouse_pos.x - o_handle.grab_offset[0]
                         o_rect.y = self.mouse_pos.y - o_handle.grab_offset[1]
-            
+
+        screen.fill(black)
+        for o in self.object_handles:
             screen.blit(o.fields["object"], o.fields["rect"])
         pygame.display.flip()
 
