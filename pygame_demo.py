@@ -70,5 +70,6 @@ class GameState:
 
 state = GameState()
 state.add_object(pygame.image.load("intro_ball.gif"))
+state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (200, 300)))
 while 1:
     state.step()
