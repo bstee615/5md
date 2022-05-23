@@ -1,26 +1,27 @@
 import sys
-import pygame_demo
-pygame_demo.init()
+import pygame
+pygame.init()
 
 size = width, height = 320, 240
 speed = [2, 2]
 black = 0, 0, 0
 
-screen = pygame_demo.display.set_mode(size)
+screen = pygame.display.set_mode(size)
 
-ball = pygame_demo.image.load("intro_ball.gif")
+ball = pygame.image.load("intro_ball.gif")
 ballrect = ball.get_rect()
 
-while 1:
-    for event in pygame_demo.event.get():
-        if event.type == pygame_demo.QUIT: sys.exit()
+mousex = 10
+mousey = 10
 
-    ballrect = ballrect.move(speed)
-    if ballrect.left < 0 or ballrect.right > width:
-        speed[0] = -speed[0]
-    if ballrect.top < 0 or ballrect.bottom > height:
-        speed[1] = -speed[1]
+while 1:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT: sys.exit()
+
+    mousex, mousey = pygame.mouse.get_pos()
+    ballrect.x = mousex
+    ballrect.y = mousey
 
     screen.fill(black)
     screen.blit(ball, ballrect)
-    pygame_demo.display.flip()
+    pygame.display.flip()
