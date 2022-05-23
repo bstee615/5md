@@ -82,6 +82,7 @@ class GameState:
                     o.fields["handle"].grabbed = False
                     if enemy_rect.colliderect(o_rect):
                         print("played card", enemy_rect, o_rect)
+                        o.set_pos(pygame.Vector2(enemy_rect.x, enemy_rect.y))
 
     def update_mouse_pos(self):
         self.mouse_pos.update(pygame.mouse.get_pos())
@@ -118,8 +119,8 @@ class GameState:
 
 state = GameState()
 enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (400, 200)))
-king_card = state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 200)), draggable=True)
-king_card.add_child(state.add_object(pygame.transform.scale(pygame.image.load("ranger_playing_board.jpg"), (200, 100)), draggable=True), pygame.Vector2())
+state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 200)), draggable=True)
+state.add_object(pygame.transform.scale(pygame.image.load("ranger_playing_board.jpg"), (200, 100)), draggable=True)
 
 enemy_board.set_pos(pygame.Vector2(300, 300))
 enemy_board_playzone = state.add_object(pygame.Rect(0, 0, 100, 100))
