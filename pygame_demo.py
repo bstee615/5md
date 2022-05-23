@@ -2,7 +2,7 @@ import sys
 import pygame
 pygame.init()
 
-size = width, height = 1024, 768
+size = width, height = 800, 600
 black = 0, 0, 0
 
 screen = pygame.display.set_mode(size)
@@ -21,6 +21,9 @@ class MyObject:
             self.fields["rect"] = obj.get_rect()
         if draggable:
             self.fields["handle"] = Handle()
+    
+    def __repr__(self):
+        return f"{self.fields}"
 
 class GameState:
     """Global game state"""
@@ -45,8 +48,18 @@ class GameState:
             if obj_rect.collidepoint(self.mouse_pos):
                 obj_handle = obj.fields["handle"]
                 obj_handle.grab_offset = pygame.Vector2(self.mouse_pos.x - obj_rect.x, self.mouse_pos.y - obj_rect.y)
-                print("mouse", self.mouse_pos, "ball", obj_rect, "offset", obj_handle.grab_offset)
+                print("mouse", self.mouse_pos, "object", obj_rect, "offset", obj_handle.grab_offset)
                 obj_handle.grabbed = True
+
+    def drop(self):
+        enemy_rect = self.named_objects["enemy_board"].fields["rect"]
+        for o in self.object_handles:
+            if "handle" in o.fields and "rect" in o.fields:
+                o_rect = o.fields["rect"]
+                if o.fields["handle"].grabbed:
+                    o.fields["handle"].grabbed = False
+                    if enemy_rect.colliderect(o_rect):
+                        print("played card", enemy_rect, o_rect)
 
     def update_mouse_pos(self):
         self.mouse_pos.update(pygame.mouse.get_pos())
@@ -61,9 +74,7 @@ class GameState:
             if event.type == pygame.MOUSEBUTTONUP:
                 left, middle, right = pygame.mouse.get_pressed()
                 if not left:
-                    for o in self.object_handles:
-                        if "handle" in o.fields:
-                            o.fields["handle"].grabbed = False
+                    self.drop()
 
         state.update_mouse_pos()
 
@@ -81,7 +92,7 @@ class GameState:
         pygame.display.flip()
 
 state = GameState()
-enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (400, 200)))
+enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (400, 200)), name="enemy_board")
 state.add_object(pygame.image.load("intro_ball.gif"), draggable=True)
 state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 200)), draggable=True)
 state.add_object(pygame.transform.scale(pygame.image.load("ranger_playing_board.jpg"), (200, 100)), draggable=True)
