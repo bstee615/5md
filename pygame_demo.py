@@ -17,6 +17,7 @@ if networking:
     ws = simple_websocket.Client('ws://localhost:5000/game')
 
 def send_ws_command(cmd):
+    print("send_ws_command", cmd)
     if networking:
         ws.send(cmd)
 def close_network():
@@ -141,12 +142,14 @@ class GameState:
                 if o.fields["handle"].grabbed:
                     o.fields["handle"].grabbed = False
                     if play_rect.colliderect(o_rect) or "play_area_index" in o.fields:
-                        print("played card", play_rect, o_rect)
+                        print("play card", play_rect, o_rect)
+                        if "play_area_index" not in o.fields:
+                            card_str = repr(o.fields["model"])
+                            send_ws_command(f"play_hero_card Ranger {card_str}")
                         play_area_index = o.fields.get("play_area_index", None)
                         if play_area_index is None:
                             play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
                         self.move_to_play_area_position(o, play_area_index)
-        send_ws_command("play_hero_card Ranger SWORD=1")
 
     def update_mouse_pos(self):
         self.mouse_pos.update(pygame.mouse.get_pos())
