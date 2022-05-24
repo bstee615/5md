@@ -13,6 +13,11 @@ class HeroCard:
 class SymbolCard(HeroCard):
     def __init__(self, symbols) -> None:
         self.symbols = symbols
+        self.name = ",".join(f"{symbol.name}={count}" for symbol, count in self.symbols.items())
+    
+    def __repr__(self):
+        simple_dict = {symbol.name: count for symbol, count in self.symbols.items()}
+        return self.name
 
 class ActionCard(HeroCard):
     def __init__(self) -> None:
@@ -47,7 +52,7 @@ class Hero:
 class Game:
     def __init__(self):
         self.boss = None
-        self.heroes = []
+        self.heroes = {}
         self.enemy_deck = []
         self.timer = None
         self.hero_cards_played = []
@@ -66,11 +71,13 @@ class Game:
     
     def add_hero(self, name):
         card = Hero(name)
-        self.heroes.append(card)
+        self.heroes[name] = card
+        return card
     
     def add_enemy(self, name, symbols):
         card = EnemyCard(name, symbols)
         self.enemy_deck.append(card)
+        return card
 
     def top_enemy(self):
         if len(self.enemy_deck) > 0:
@@ -83,7 +90,10 @@ class Game:
             self.enemy_deck.pop(0)
         self.hero_cards_played = []
 
-    def play_hero_card(self, card):
+    def play_hero_card(self, hero_name, card_name):
+        hero = self.heroes[hero_name]
+        card_idx = next(i for i, c in enumerate(hero.hand) if c.name == card_name)
+        card = hero.hand.pop(card_idx)
         self.hero_cards_played.append(card)
         self.apply_hero_cards()
     
@@ -99,6 +109,10 @@ class Game:
     
     def __repr__(self):
         return f"Game(\n\tboss={self.boss},\n\theroes={self.heroes},\n\tenemy_deck={self.enemy_deck},\n\ttimer={self.timer},\n\thero_cards_played={self.hero_cards_played}\n)"
+
+def test_symbol_card():
+    assert SymbolCard({Symbols.SWORD: 1}).name == "SWORD=1"
+    assert SymbolCard({Symbols.SWORD: 1, Symbols.ARROW: 1}).name == "SWORD=1,ARROW=1"
 
 def test_empty():
     game = Game()

@@ -7,6 +7,9 @@ black = 0, 0, 0
 
 screen = pygame.display.set_mode(size)
 
+import simple_websocket
+ws = simple_websocket.Client('ws://localhost:5000/game')
+
 class Handle:
     """Grabbable handle on object"""
     def __init__(self):
@@ -83,13 +86,16 @@ class GameState:
                     if enemy_rect.colliderect(o_rect):
                         print("played card", enemy_rect, o_rect)
                         o.set_pos(pygame.Vector2(enemy_rect.x, enemy_rect.y))
+        ws.send("play_hero_card Ranger SWORD=1")
 
     def update_mouse_pos(self):
         self.mouse_pos.update(pygame.mouse.get_pos())
         
     def step(self):
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: sys.exit()
+            if event.type == pygame.QUIT:
+                ws.close()
+                sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 left, middle, right = pygame.mouse.get_pressed()
                 if left:
