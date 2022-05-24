@@ -1,14 +1,24 @@
 import sys
 import pygame
+import simple_websocket
 pygame.init()
 
-size = width, height = 800, 600
-black = 0, 0, 0
+size = width, height = 1024, 768
+background = pygame.image.load("bg.png")
 
 screen = pygame.display.set_mode(size)
 
-import simple_websocket
-ws = simple_websocket.Client('ws://localhost:5000/game')
+networking = False
+
+if networking:
+    ws = simple_websocket.Client('ws://localhost:5000/game')
+
+def send_ws_command(cmd):
+    if networking:
+        ws.send(cmd)
+def close_network():
+    if networking:
+        ws.close()
 
 class Handle:
     """Grabbable handle on object"""
@@ -77,16 +87,16 @@ class GameState:
                 obj_handle.grabbed = True
 
     def drop(self):
-        enemy_rect = enemy_board_playzone.fields["rect"]
+        play_rect = play_area.fields["rect"]
         for o in self.object_handles:
             if "handle" in o.fields and "rect" in o.fields:
                 o_rect = o.fields["rect"]
                 if o.fields["handle"].grabbed:
                     o.fields["handle"].grabbed = False
-                    if enemy_rect.colliderect(o_rect):
-                        print("played card", enemy_rect, o_rect)
-                        o.set_pos(pygame.Vector2(enemy_rect.x, enemy_rect.y))
-        ws.send("play_hero_card Ranger SWORD=1")
+                    if play_rect.colliderect(o_rect):
+                        print("played card", play_rect, o_rect)
+                        o.set_pos(pygame.Vector2(play_rect.x, play_rect.y))
+        send_ws_command("play_hero_card Ranger SWORD=1")
 
     def update_mouse_pos(self):
         self.mouse_pos.update(pygame.mouse.get_pos())
@@ -94,12 +104,14 @@ class GameState:
     def step(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                ws.close()
+                close_network()
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 left, middle, right = pygame.mouse.get_pressed()
                 if left:
                     self.try_pickup()
+                if middle:
+                    print(pygame.mouse.get_pos())
             if event.type == pygame.MOUSEBUTTONUP:
                 left, middle, right = pygame.mouse.get_pressed()
                 if not left:
@@ -115,7 +127,7 @@ class GameState:
                         o_handle = o.fields["handle"]
                         o.set_pos(self.mouse_pos - o_handle.grab_offset)
 
-        screen.fill(black)
+        screen.blit(background, (0, 0))
         for o in self.object_handles:
             if isinstance(o.fields["object"], pygame.Surface):
                 screen.blit(o.fields["object"], o.fields["rect"])
@@ -124,13 +136,18 @@ class GameState:
         pygame.display.flip()
 
 state = GameState()
-enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (400, 200)))
-state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 200)), draggable=True)
-state.add_object(pygame.transform.scale(pygame.image.load("ranger_playing_board.jpg"), (200, 100)), draggable=True)
+state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)), draggable=True).set_pos(pygame.Vector2(300, 600))
+state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)), draggable=True).set_pos(pygame.Vector2(450, 600))
+state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)), draggable=True).set_pos(pygame.Vector2(600, 600))
 
-enemy_board.set_pos(pygame.Vector2(300, 300))
-enemy_board_playzone = state.add_object(pygame.Rect(0, 0, 100, 100))
-enemy_board.add_child(enemy_board_playzone, pygame.Vector2(250, 50))
+enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (250, 100)))
+enemy_board.set_pos(pygame.Vector2(650, 400))
+
+play_area = state.add_object(pygame.Rect(200, 200, 400, 300))
+
+p1 = state.add_object(pygame.Rect(50, 50, 50, 50))
+p2 = state.add_object(pygame.Rect((1024 // 2) - 25, 50, 50, 50))
+p3 = state.add_object(pygame.Rect(1024 - 50 - 50, 50, 50, 50))
 
 while 1:
     state.step()
