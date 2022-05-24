@@ -140,22 +140,12 @@ class GameState:
                 o_rect = o.fields["rect"]
                 if o.fields["handle"].grabbed:
                     o.fields["handle"].grabbed = False
-                    if play_rect.colliderect(o_rect):
+                    if play_rect.colliderect(o_rect) or "play_area_index" in o.fields:
                         print("played card", play_rect, o_rect)
                         play_area_index = o.fields.get("play_area_index", None)
                         if play_area_index is None:
                             play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
                         self.move_to_play_area_position(o, play_area_index)
-                    elif "hand_index" in o.fields:
-                        self.move_to_hand_position(o, o.fields["hand_index"])
-                        if "play_area_index" in o.fields:
-                            idx = o.fields["play_area_index"]
-                            for c in self.object_handles:
-                                if c_idx := c.fields.get("play_area_index", -1) > idx:
-                                    new_c_idx = c_idx - 1
-                                    c.fields["play_area_index"] = new_c_idx
-                                    self.move_to_play_area_position(c, new_c_idx)
-                            del o.fields["play_area_index"]
         send_ws_command("play_hero_card Ranger SWORD=1")
 
     def update_mouse_pos(self):
