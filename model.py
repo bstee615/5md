@@ -6,21 +6,26 @@ class Symbols(Enum):
     ARROW = 2
     JUMP = 3
 
+card_global_index = 0
 class HeroCard:
     def __init__(self) -> None:
-        pass
+        global card_global_index
+        self.index = card_global_index
+        card_global_index += 1
 
 class SymbolCard(HeroCard):
     def __init__(self, symbols) -> None:
+        super().__init__()
         self.symbols = symbols
         self.name = ",".join(f"{symbol.name}={count}" for symbol, count in self.symbols.items())
     
     def __repr__(self):
         simple_dict = {symbol.name: count for symbol, count in self.symbols.items()}
-        return self.name
+        return f"{self.name}(id={self.index}, {simple_dict})"
 
 class ActionCard(HeroCard):
     def __init__(self) -> None:
+        super().__init__()
         pass
 
 class EnemyCard:

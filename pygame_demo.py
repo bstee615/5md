@@ -1,6 +1,8 @@
 import sys
 import pygame
 import simple_websocket
+
+from model import SymbolCard, Symbols
 pygame.init()
 
 size = width, height = 1024, 768
@@ -8,6 +10,7 @@ background = pygame.image.load("bg.png")
 
 screen = pygame.display.set_mode(size)
 
+"""NETWORKING"""
 networking = False
 
 if networking:
@@ -19,6 +22,7 @@ def send_ws_command(cmd):
 def close_network():
     if networking:
         ws.close()
+"""NETWORKING"""
 
 class Handle:
     """Grabbable handle on object"""
@@ -61,12 +65,55 @@ class MyObject:
     def __repr__(self):
         return f"{self.fields}"
 
+class GameModel:
+    def __init__(self):
+        self.cards = [
+            SymbolCard({Symbols.SWORD: 1}),
+            SymbolCard({Symbols.ARROW: 1}),
+            SymbolCard({Symbols.JUMP: 1})
+        ]
+        self.play_area_cards = []
+
 class GameState:
     """Global game state"""
     def __init__(self):
         self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
         self.object_handles = []
         self.named_objects = {}
+        self.model = GameModel()
+        
+        self.init_objects()
+    
+    def move_to_hand_position(self, card_obj, i):
+        space_between_cards = 125
+        x = (1024 // 2) - 50 - ((space_between_cards * len(self.model.cards)) // 2) + (space_between_cards * i)
+        y = 600
+        card_obj.set_pos(pygame.Vector2(x, y))
+    
+    def move_to_play_area_position(self, card_obj, i):
+        play_rect = self.named_objects["play_area"].fields["rect"]
+        card_offset = 125
+        left = play_rect.x + (card_offset * i)
+        card_obj.set_pos(pygame.Vector2(left, play_rect.y))
+
+    def init_objects(self):
+        enemy_board = self.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (250, 100)))
+        enemy_board.set_pos(pygame.Vector2(650, 400))
+
+        self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
+
+        for i, card in enumerate(self.model.cards):
+            card_obj = self.add_object(
+                pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)),
+                draggable=True
+                )
+            card_obj.fields["hand_index"] = i
+            card_obj.fields["model"] = card
+            self.move_to_hand_position(card_obj, i)
+
+        p1 = self.add_object(pygame.Rect(50, 50, 50, 50))
+        p2 = self.add_object(pygame.Rect((1024 // 2) - 25, 50, 50, 50))
+        p3 = self.add_object(pygame.Rect(1024 - 50 - 50, 50, 50, 50))
 
     def add_object(self, obj, name=None, **kwargs):
         my_obj = MyObject(obj, **kwargs)
@@ -87,7 +134,7 @@ class GameState:
                 obj_handle.grabbed = True
 
     def drop(self):
-        play_rect = play_area.fields["rect"]
+        play_rect = self.named_objects["play_area"].fields["rect"]
         for o in self.object_handles:
             if "handle" in o.fields and "rect" in o.fields:
                 o_rect = o.fields["rect"]
@@ -95,7 +142,14 @@ class GameState:
                     o.fields["handle"].grabbed = False
                     if play_rect.colliderect(o_rect):
                         print("played card", play_rect, o_rect)
-                        o.set_pos(pygame.Vector2(play_rect.x, play_rect.y))
+                        play_area_index = o.fields.get("play_area_index", None)
+                        if play_area_index is None:
+                            play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
+                        self.move_to_play_area_position(o, play_area_index)
+                    elif "hand_index" in o.fields:
+                        self.move_to_hand_position(o, o.fields["hand_index"])
+                        if "play_area_index" in o.fields:
+                            del o.fields["play_area_index"]
         send_ws_command("play_hero_card Ranger SWORD=1")
 
     def update_mouse_pos(self):
@@ -136,18 +190,6 @@ class GameState:
         pygame.display.flip()
 
 state = GameState()
-state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)), draggable=True).set_pos(pygame.Vector2(300, 600))
-state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)), draggable=True).set_pos(pygame.Vector2(450, 600))
-state.add_object(pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)), draggable=True).set_pos(pygame.Vector2(600, 600))
-
-enemy_board = state.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (250, 100)))
-enemy_board.set_pos(pygame.Vector2(650, 400))
-
-play_area = state.add_object(pygame.Rect(200, 200, 400, 300))
-
-p1 = state.add_object(pygame.Rect(50, 50, 50, 50))
-p2 = state.add_object(pygame.Rect((1024 // 2) - 25, 50, 50, 50))
-p3 = state.add_object(pygame.Rect(1024 - 50 - 50, 50, 50, 50))
 
 while 1:
     state.step()
