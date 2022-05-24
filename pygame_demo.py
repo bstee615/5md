@@ -149,6 +149,12 @@ class GameState:
                     elif "hand_index" in o.fields:
                         self.move_to_hand_position(o, o.fields["hand_index"])
                         if "play_area_index" in o.fields:
+                            idx = o.fields["play_area_index"]
+                            for c in self.object_handles:
+                                if c_idx := c.fields.get("play_area_index", -1) > idx:
+                                    new_c_idx = c_idx - 1
+                                    c.fields["play_area_index"] = new_c_idx
+                                    self.move_to_play_area_position(c, new_c_idx)
                             del o.fields["play_area_index"]
         send_ws_command("play_hero_card Ranger SWORD=1")
 
