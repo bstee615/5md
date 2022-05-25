@@ -22,7 +22,8 @@ if networking:
 def send_ws_command(cmd):
     print("send_ws_command", cmd)
     if networking:
-        return ws.send(cmd)
+        ws.send(cmd)
+        return ws.receive()
 def close_network():
     if networking:
         ws.close()
@@ -199,13 +200,17 @@ class GameState:
                     if play_rect.colliderect(o_rect) or "play_area_index" in o.fields:
                         print("play card", play_rect, o_rect)
                         if "play_area_index" not in o.fields:
-                            response = send_ws_command(json.dumps({
+                            data = send_ws_command(json.dumps({
                                 "command": "play_hero_card",
                                 "hero_name": "Ranger",
                                 "card_index": o.fields["model"].index,
                             }))
-                            if response == "error":
+                            response = json.loads(data)
+                            if response["result"] == "error":
                                 continue
+                            else:
+                                for action in response["actions"]:
+                                    print("action", action)
                         play_area_index = o.fields.get("play_area_index", None)
                         if play_area_index is None:
                             play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1

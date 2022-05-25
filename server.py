@@ -18,11 +18,11 @@ print(game)
 def run_command(data):
     command = jsonpickle.decode(data)
     if command["command"] == "play_hero_card":
-        result = game.play_hero_card(command["hero_name"], int(command["card_index"]))
+        result, actions = game.play_hero_card(command["hero_name"], int(command["card_index"]))
         ret = {
             "command": "play_hero_card",
             "result": result,
-            "game": jsonpickle.encode(game),
+            "actions": actions,
         }
     # elif command_split[0] == "list_cards":
     #     hero = game.heroes[command_split[1]]

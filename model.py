@@ -140,29 +140,44 @@ class Game:
             return self.boss
 
     def defeat_enemy(self):
+        actions = []
         if len(self.enemy_deck) > 0:
             self.enemy_deck.pop(0)
+            actions.append({"action": "flip_enemy", "new_enemy": self.top_enemy().index})
         self.hero_cards_played = []
+        return actions
 
     def play_hero_card(self, hero_name, card_idx):
         hero = self.heroes[hero_name]
         card_idx = next((i for i, c in enumerate(hero.hand) if c.index == card_idx), None)
         if card_idx is not None:
+            actions = []
             card = hero.hand.pop(card_idx)
+            actions.append({
+                "action": "play_card",
+                "player_name": hero_name,
+                "entity": card.index,
+                "from": "hand",
+                "to": "play_area",
+            })
             self.hero_cards_played.append(card)
-            self.apply_hero_cards()
-            return "success"
-        return "error"
+            actions += self.apply_hero_cards()
+            return "success", actions
+        return "error", [{"action": "revert"}]
     
     def apply_hero_cards(self):
+        actions = []
         top_enemy = self.top_enemy()
 
         all_symbols = defaultdict(int)
         for card in self.hero_cards_played:
             for symbol, count in card.symbols.items():
                 all_symbols[symbol] += count
-        if all(count >= top_enemy.symbols.get(symbol, -1) for symbol, count in all_symbols.items()):
-            self.defeat_enemy()
+        beat = [count >= top_enemy.symbols.get(symbol, 100) for symbol, count in all_symbols.items()]
+        if len(beat) > 0 and all(beat):
+            actions += self.defeat_enemy()
+        
+        return actions
     
     def __repr__(self):
         return f"Game(\n\tboss={self.boss},\n\theroes={self.heroes},\n\tenemy_deck={self.enemy_deck},\n\ttimer={self.timer},\n\thero_cards_played={self.hero_cards_played}\n)"
