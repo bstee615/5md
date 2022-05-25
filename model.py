@@ -22,17 +22,6 @@ class SymbolCard(HeroCard):
         super().__init__(index)
         self.symbols = symbols
         self.name = ",".join(f"{symbol}={count}" for symbol, count in self.symbols.items())
-    
-    def view(self):
-        d = {symbol: count for symbol, count in self.symbols.items()}
-        d.update({
-            "index": self.index,
-            "name": self.name,
-        })
-        return d
-
-    def __repr__(self):
-        return json.dumps(self.view())
 
 class ActionCard(HeroCard):
     def __init__(self):
@@ -47,12 +36,6 @@ class EnemyCard:
         enemy_global_index += 1
         self.name = name
         self.symbols = symbols
-
-    def view(self):
-        return {
-            "name": self.name,
-            "symbols": self.symbols,
-        }
     
     def __repr__(self) -> str:
         return f"{self.name}(symbols={self.symbols})"
@@ -64,12 +47,6 @@ class BossCard:
         enemy_global_index += 1
         self.name = name
         self.symbols = symbols
-
-    def view(self):
-        return {
-            "name": self.name,
-            "symbols": self.symbols,
-        }
     
     def __repr__(self) -> str:
         return f"{self.name}(symbols={self.symbols})"
@@ -80,14 +57,6 @@ class Hero:
         self.deck = []
         self.discard = []
         self.hand = []
-
-    def view(self):
-        return {
-            "name": self.name,
-            "deck": [c.view() for c in self.deck],
-            "discard": [c.view() for c in self.discard],
-            "hand": [c.view() for c in self.hand],
-        }
     
     def __repr__(self) -> str:
         return f"{self.name}(hand={self.hand}, deck={self.deck}, discard={self.discard})"
@@ -99,17 +68,6 @@ class Game:
         self.enemy_deck = []
         self.timer = None
         self.hero_cards_played = []
-    
-    def view(self):
-        return {
-            "boss": self.boss.view(),
-            "heroes": {
-                name: data.view()
-                for name, data in self.heroes.items()
-            },
-            "enemy_deck": [c.view() for c in self.enemy_deck],
-            "hero_cards_played": [c.view() for c in self.hero_cards_played]
-        }
     
     def init_boss(self, name):
         if name == "Baby Barbarian":
@@ -143,7 +101,9 @@ class Game:
         actions = []
         if len(self.enemy_deck) > 0:
             self.enemy_deck.pop(0)
-            actions.append({"action": "flip_enemy", "new_enemy": self.top_enemy().index})
+            actions.append({"action": "flip_enemy", "new_enemy_index": self.top_enemy().index})
+        for hero_name, card in self.hero_cards_played:
+            self.heroes[hero_name].discard.append(card)
         self.hero_cards_played = []
         return actions
 
@@ -160,7 +120,7 @@ class Game:
                 "from": "hand",
                 "to": "play_area",
             })
-            self.hero_cards_played.append(card)
+            self.hero_cards_played.append((hero_name, card))
             actions += self.apply_hero_cards()
             return "success", actions
         return "error", [{"action": "revert"}]
@@ -170,7 +130,7 @@ class Game:
         top_enemy = self.top_enemy()
 
         all_symbols = defaultdict(int)
-        for card in self.hero_cards_played:
+        for _, card in self.hero_cards_played:
             for symbol, count in card.symbols.items():
                 all_symbols[symbol] += count
         beat = [count >= top_enemy.symbols.get(symbol, 100) for symbol, count in all_symbols.items()]
