@@ -1,3 +1,4 @@
+import json
 import jsonpickle
 from flask import Flask, request
 import simple_websocket
@@ -14,18 +15,26 @@ hero.hand.append(SymbolCard({Symbols.ARROW: 1}))
 game.add_enemy("Slime", {Symbols.SWORD: 2})
 print(game)
 
-def run_command(command):
-    command_split = command.split()
-    print(f"command {command_split}")
-    if command_split[0] == "play_hero_card":
-        result = game.play_hero_card(command_split[1], int(command_split[2]))
-        return f"play_hero_card {result}"
+def run_command(data):
+    command = jsonpickle.decode(data)
+    if command["command"] == "play_hero_card":
+        result = game.play_hero_card(command["hero_name"], int(command["card_index"]))
+        ret = {
+            "command": "play_hero_card",
+            "result": result,
+            "game": jsonpickle.encode(game),
+        }
     # elif command_split[0] == "list_cards":
     #     hero = game.heroes[command_split[1]]
     #     return f"{command_split[0]} {json.dumps([c.to_dict() for c in hero.hand])}"
-    elif command_split[0] == "init":
-        return jsonpickle.encode(game)
-    print(game)
+    elif command["command"] == "init":
+        ret = {
+            "command": command,
+            "game": jsonpickle.encode(game)
+        }
+    ret = json.dumps(ret)
+    print(ret)
+    return ret
 
 @app.route('/game', websocket=True)
 def run_game():

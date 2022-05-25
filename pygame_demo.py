@@ -1,3 +1,4 @@
+import json
 import jsonpickle
 import sys
 import traceback
@@ -30,8 +31,12 @@ def init_card_from_repr(card_repr):
 
 def initialize_from_network():
     if networking:
-        ws.send(f"init")
-        return jsonpickle.decode(ws.receive())
+        ws.send(jsonpickle.encode({"command": "init"}))
+        data = ws.receive()
+        print("data =", repr(data))
+        response = json.loads(data)
+        print("response =", response)
+        return jsonpickle.decode(response["game"])
     else:
         # Dummy data
         d = Game()
@@ -159,8 +164,11 @@ class GameState:
                     if play_rect.colliderect(o_rect) or "play_area_index" in o.fields:
                         print("play card", play_rect, o_rect)
                         if "play_area_index" not in o.fields:
-                            card_str = o.fields["model"].index
-                            response = send_ws_command(f"play_hero_card Ranger {card_str}")
+                            response = send_ws_command(json.dumps({
+                                "command": "play_hero_card",
+                                "hero_name": "Ranger",
+                                "card_index": o.fields["model"].index,
+                            }))
                             if response == "error":
                                 continue
                         play_area_index = o.fields.get("play_area_index", None)
@@ -212,4 +220,5 @@ while 1:
         state.step()
     except Exception:
         traceback.print_exc()
+        close_network()
         exit(1)
