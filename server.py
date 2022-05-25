@@ -13,6 +13,7 @@ hero.hand.append(SymbolCard({SWORD: 1}))
 hero.hand.append(SymbolCard({SWORD: 1}))
 hero.hand.append(SymbolCard({ARROW: 1}))
 game.add_enemy("Slime", {SWORD: 2})
+game.add_enemy("Skeleton", {ARROW: 1})
 print(game)
 
 
