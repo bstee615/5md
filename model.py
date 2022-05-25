@@ -3,10 +3,9 @@ from collections import defaultdict
 from enum import Enum
 import json
 
-class Symbols(Enum):
-    SWORD = 1
-    ARROW = 2
-    JUMP = 3
+SWORD = "SWORD"
+ARROW = "ARROW"
+JUMP = "JUMP"
 
 card_global_index = 0
 class HeroCard:
@@ -22,10 +21,10 @@ class SymbolCard(HeroCard):
     def __init__(self, symbols, index=None):
         super().__init__(index)
         self.symbols = symbols
-        self.name = ",".join(f"{symbol.name}={count}" for symbol, count in self.symbols.items())
+        self.name = ",".join(f"{symbol}={count}" for symbol, count in self.symbols.items())
     
     def view(self):
-        d = {symbol.name: count for symbol, count in self.symbols.items()}
+        d = {symbol: count for symbol, count in self.symbols.items()}
         d.update({
             "index": self.index,
             "name": self.name,
@@ -115,9 +114,9 @@ class Game:
     def init_boss(self, name):
         if name == "Baby Barbarian":
             symbols = {
-                Symbols.SWORD: 2,
-                Symbols.ARROW: 2,
-                Symbols.JUMP: 3,
+                SWORD: 2,
+                ARROW: 2,
+                JUMP: 3,
             }
         else:
             raise NotImplementedError(f"boss {name}")
@@ -169,8 +168,8 @@ class Game:
         return f"Game(\n\tboss={self.boss},\n\theroes={self.heroes},\n\tenemy_deck={self.enemy_deck},\n\ttimer={self.timer},\n\thero_cards_played={self.hero_cards_played}\n)"
 
 def test_symbol_card():
-    assert SymbolCard({Symbols.SWORD: 1}).name == "SWORD=1"
-    assert SymbolCard({Symbols.SWORD: 1, Symbols.ARROW: 1}).name == "SWORD=1,ARROW=1"
+    assert SymbolCard({SWORD: 1}).name == "SWORD=1"
+    assert SymbolCard({SWORD: 1, ARROW: 1}).name == "SWORD=1,ARROW=1"
 
 def test_empty():
     game = Game()
@@ -179,18 +178,18 @@ def test_init():
     game = Game()
     game.init_boss("Baby Barbarian")
     game.add_hero("Ranger")
-    game.add_enemy("Slime", {Symbols.SWORD: 1})
-    game.add_enemy("Bear", {Symbols.ARROW: 1})
-    game.add_enemy("Skeleton", {Symbols.JUMP: 1})
+    game.add_enemy("Slime", {SWORD: 1})
+    game.add_enemy("Bear", {ARROW: 1})
+    game.add_enemy("Skeleton", {JUMP: 1})
     assert game.top_enemy().name == "Slime"
 
 def test_defeat_enemy():
     game = Game()
     game.init_boss("Baby Barbarian")
     game.add_hero("Ranger")
-    game.add_enemy("Slime", {Symbols.SWORD: 1})
-    game.add_enemy("Bear", {Symbols.ARROW: 1})
-    game.add_enemy("Skeleton", {Symbols.JUMP: 1})
+    game.add_enemy("Slime", {SWORD: 1})
+    game.add_enemy("Bear", {ARROW: 1})
+    game.add_enemy("Skeleton", {JUMP: 1})
     assert game.top_enemy().name == "Slime"
     game.defeat_enemy()
     assert game.top_enemy().name == "Bear"
@@ -203,19 +202,19 @@ def test_play_hero_card():
     game = Game()
     game.init_boss("Baby Barbarian")
     game.add_hero("Ranger")
-    game.add_enemy("Slime", {Symbols.SWORD: 2})
+    game.add_enemy("Slime", {SWORD: 2})
     assert game.top_enemy().name == "Slime"
 
-    card = SymbolCard({Symbols.SWORD: 1})
+    card = SymbolCard({SWORD: 1})
     game.play_hero_card(card)
     assert game.top_enemy().name == "Slime"
 
-    card = SymbolCard({Symbols.SWORD: 1})
+    card = SymbolCard({SWORD: 1})
     game.play_hero_card(card)
     assert game.top_enemy().name == "Baby Barbarian"
     
-    game.add_enemy("Slime", {Symbols.SWORD: 2})
+    game.add_enemy("Slime", {SWORD: 2})
     assert game.top_enemy().name == "Slime"
-    card = SymbolCard({Symbols.SWORD: 2})
+    card = SymbolCard({SWORD: 2})
     game.play_hero_card(card)
     assert game.top_enemy().name == "Baby Barbarian"

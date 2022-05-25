@@ -3,16 +3,16 @@ import jsonpickle
 from flask import Flask, request
 import simple_websocket
 
-from model import Game, SymbolCard, Symbols
+from model import ARROW, SWORD, Game, SymbolCard
 app = Flask(__name__)
 
 game = Game()
 game.init_boss("Baby Barbarian")
 hero = game.add_hero("Ranger")
-hero.hand.append(SymbolCard({Symbols.SWORD: 1}))
-hero.hand.append(SymbolCard({Symbols.SWORD: 1}))
-hero.hand.append(SymbolCard({Symbols.ARROW: 1}))
-game.add_enemy("Slime", {Symbols.SWORD: 2})
+hero.hand.append(SymbolCard({SWORD: 1}))
+hero.hand.append(SymbolCard({SWORD: 1}))
+hero.hand.append(SymbolCard({ARROW: 1}))
+game.add_enemy("Slime", {SWORD: 2})
 print(game)
 
 def run_command(data):

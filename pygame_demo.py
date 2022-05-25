@@ -5,7 +5,7 @@ import traceback
 import pygame
 import simple_websocket
 
-from model import Game, SymbolCard, Symbols
+from model import ARROW, JUMP, SWORD, Game, SymbolCard
 pygame.init()
 
 size = width, height = 1024, 768
@@ -42,9 +42,9 @@ def initialize_from_network():
         d = Game()
         ranger = d.add_hero("Ranger")
         ranger.hand += [
-            SymbolCard({Symbols.SWORD: 1}),
-            SymbolCard({Symbols.ARROW: 1}),
-            SymbolCard({Symbols.JUMP: 1})
+            SymbolCard({SWORD: 1}),
+            SymbolCard({ARROW: 1}),
+            SymbolCard({JUMP: 1})
         ]
         return d
 """NETWORKING"""
@@ -96,6 +96,12 @@ class GameView:
         self.hero_name = "Ranger"
 
 enemy_pos = pygame.Vector2(750, 200)
+symbol_pos = {
+    SWORD: pygame.Vector2(750, 400),
+    ARROW: pygame.Vector2(750, 450),
+    JUMP: pygame.Vector2(750, 500),
+}
+
 class GameState:
     """Global game state"""
     def __init__(self):
@@ -103,6 +109,7 @@ class GameState:
         self.object_handles = []
         self.named_objects = {}
         self.game = GameView()
+        self.enemy_symbols = []
         
         self.init_objects()
     
@@ -120,6 +127,15 @@ class GameState:
 
     def show_enemy(self, card, card_obj):
         card_obj.set_pos(enemy_pos)
+        for symbol, count in card.symbols.items():
+            for i in range(count):
+                symbol_obj = self.add_object(
+                    pygame.transform.scale(pygame.image.load(f"{symbol}.jpg"), (50, 50)),
+                    draggable=True
+                )
+                symbol_obj.set_pos(symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
+                self.enemy_symbols.append(symbol_obj)
+
     def init_objects(self):
         enemy_board = self.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (250, 100)))
         enemy_board.set_pos(pygame.Vector2(650, 400))
