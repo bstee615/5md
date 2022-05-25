@@ -142,7 +142,6 @@ class Game:
         return status, actions
 
     def apply_hero_cards(self):
-        print("apply_hero_cards")
         actions = []
         top_enemy = self.top_enemy()
 
@@ -151,7 +150,6 @@ class Game:
             for symbol, count in card.symbols.items():
                 all_symbols[symbol] += count
         beat = [all_symbols.get(symbol, -1) >= count for symbol, count in top_enemy.symbols.items()]
-        print(beat, top_enemy.symbols, all_symbols)
         if len(beat) > 0 and all(beat):
             actions += self.defeat_enemy()
 

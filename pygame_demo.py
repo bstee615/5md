@@ -101,12 +101,6 @@ class MyObject:
         return f"{self.fields}"
 
 
-class GameView:
-    def __init__(self):
-        self.game = initialize_from_network()
-        self.hero_name = "Ranger"
-
-
 enemy_pos = pygame.Vector2(750, 200)
 discard_pos = pygame.Vector2(900, 600)
 deck_pos = pygame.Vector2(100, 600)
@@ -124,15 +118,15 @@ class GameState:
         self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
         self.object_handles = []
         self.named_objects = {}
-        self.game = GameView()
         self.enemy_symbols = []
 
-        self.init_objects()
+        game = initialize_from_network()
+        self.init_objects(game, "Ranger")
 
     def move_to_hand_position(self, card_obj, i):
         space_between_cards = 125
-        x = (1024 // 2) - 50 - ((space_between_cards *
-                                 len(self.game.game.heroes[self.game.hero_name].hand)) // 2) + (space_between_cards * i)
+        num_cards_in_hand = len([o for o in self.object_handles if "hand_index" in o.fields])
+        x = ((1024 // 2) - 50 - ((space_between_cards * num_cards_in_hand) // 2) + (space_between_cards * i))
         y = 600
         card_obj.set_pos(pygame.Vector2(x, y))
 
@@ -148,7 +142,7 @@ class GameState:
     def move_to_deck(self, card_obj):
         card_obj.set_pos(deck_pos)
 
-    def show_enemy(self, card, card_obj):
+    def show_enemy(self, card_obj):
         card_obj.set_pos(enemy_pos)
         i = 0
         while i < len(self.object_handles):
@@ -157,7 +151,7 @@ class GameState:
             else:
                 i += 1
         self.enemy_symbols = []
-        for symbol, count in card.symbols.items():
+        for symbol, count in card_obj.fields["symbols"].items():
             for i in range(count):
                 symbol_obj = self.add_object(
                     pygame.transform.scale(
@@ -169,7 +163,7 @@ class GameState:
                 symbol_obj.fields["model_type"] = "symbol"
                 self.enemy_symbols.append(symbol_obj)
 
-    def init_objects(self):
+    def init_objects(self, game, hero_name):
         enemy_board = self.add_object(pygame.transform.scale(
             pygame.image.load("playing_board.jpg"), (250, 100)))
         enemy_board.set_pos(pygame.Vector2(650, 400))
@@ -180,53 +174,57 @@ class GameState:
         self.add_object(pygame.Rect(
             deck_pos.x, deck_pos.y, 100, 150), name="deck_area")
 
-        enemy_index = self.game.game.top_enemy().index
-        for i, card in enumerate(self.game.game.enemy_deck + [self.game.game.boss]):
+        enemy_index = game.top_enemy().index
+        for i, card in enumerate(game.enemy_deck + [game.boss]):
             card_obj = self.add_object(
                 pygame.transform.scale(pygame.image.load(
                     f"{card.name}.jpg"), (100, 150)),
-                draggable=True
+                draggable=True,
             )
-            card_obj.fields["model"] = card
+            card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "enemy"
+            card_obj.fields["symbols"] = card.symbols
             if card.index == enemy_index:
-                self.show_enemy(card, card_obj)
+                self.show_enemy(card_obj)
 
-        for i, card in enumerate(self.game.game.heroes[self.game.hero_name].hand):
+        hand_cards = []
+        for i, card in enumerate(game.heroes[hero_name].hand):
             card_obj = self.add_object(
                 pygame.transform.scale(pygame.image.load(
                     f"{card.name}.jpg"), (100, 150)),
-                draggable=True
+                draggable=True,
             )
             card_obj.fields["hand_index"] = i
-            card_obj.fields["model"] = card
+            card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = self.game.hero_name
-            self.move_to_hand_position(card_obj, i)
+            card_obj.fields["hero_name"] = hero_name
+            hand_cards.append(card_obj)
+        for card_obj in hand_cards:
+            self.move_to_hand_position(card_obj, card_obj.fields["hand_index"])
 
-        for i, card in enumerate(self.game.game.heroes[self.game.hero_name].discard):
+        for i, card in enumerate(game.heroes[hero_name].discard):
             card_obj = self.add_object(
                 pygame.transform.scale(pygame.image.load(
                     f"{card.name}.jpg"), (100, 150)),
-                draggable=True
+                draggable=True,
             )
-            card_obj.fields["model"] = card
+            card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = self.game.hero_name
+            card_obj.fields["hero_name"] = hero_name
             self.move_to_discard(card_obj)
 
-        for i, card in enumerate(self.game.game.heroes[self.game.hero_name].deck):
+        for i, card in enumerate(game.heroes[hero_name].deck):
             card_obj = self.add_object(
                 pygame.transform.scale(pygame.image.load(
                     f"{card.name}.jpg"), (100, 150)),
-                draggable=True
+                draggable=True,
             )
-            card_obj.fields["model"] = card
+            card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = self.game.hero_name
+            card_obj.fields["hero_name"] = hero_name
             self.move_to_deck(card_obj)
 
-        for i, (_, card) in enumerate(self.game.game.hero_cards_played):
+        for i, (_, card) in enumerate(game.hero_cards_played):
             print("play area", card)
             card_obj = self.add_object(
                 pygame.transform.scale(pygame.image.load(
@@ -234,7 +232,7 @@ class GameState:
                 draggable=True
             )
             card_obj.fields["hand_index"] = i
-            card_obj.fields["model"] = card
+            card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "hero_card"
             self.move_to_play_area_position(card_obj, i)
 
@@ -262,15 +260,15 @@ class GameState:
         print("handling", action)
         if action["action"] == "flip_enemy":
             card = next(c for c in self.object_handles if c.fields.get(
-                "model_type", None) == "enemy" and c.fields["model"].index == action["new_enemy_index"])
-            self.show_enemy(card.fields["model"], card)
+                "model_type", None) == "enemy" and c.fields["index"] == action["new_enemy_index"])
+            self.show_enemy(card)
             for o in self.object_handles:
                 if "play_area_index" in o.fields:
                     del o.fields["play_area_index"]
                     self.move_to_discard(o)
         elif action["action"] == "play_card":
             o = next(o for o in self.object_handles if o.fields.get(
-                "model_type", None) == "hero_card" and o.fields["model"].index == action["entity"])
+                "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
             play_area_index = o.fields.get("play_area_index", None)
             if play_area_index is None:
                 play_area_index = o.fields["play_area_index"] = max(
@@ -285,7 +283,7 @@ class GameState:
                     
         elif action["action"] == "draw_card":
             o = next(o for o in self.object_handles if o.fields.get(
-                "model_type", None) == "hero_card" and o.fields["model"].index == action["entity"])
+                "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
             hand_index = o.fields.get("hand_index", None)
             if hand_index is None:
                 hand_index = o.fields["hand_index"] = max(c.fields.get("hand_index", -1) for c in self.object_handles) + 1
@@ -304,7 +302,7 @@ class GameState:
                         data = send_ws_command(json.dumps({
                             "command": "play_hero_card",
                             "hero_name": "Ranger",
-                            "card_index": o.fields["model"].index,
+                            "card_index": o.fields["index"],
                         }))
                         response = json.loads(data)
                         print("result", response["result"])
