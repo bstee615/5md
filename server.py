@@ -15,10 +15,12 @@ hero.hand.append(SymbolCard({ARROW: 1}))
 game.add_enemy("Slime", {SWORD: 2})
 print(game)
 
+
 def run_command(data):
     command = jsonpickle.decode(data)
     if command["command"] == "play_hero_card":
-        result, actions = game.play_hero_card(command["hero_name"], int(command["card_index"]))
+        result, actions = game.play_hero_card(
+            command["hero_name"], int(command["card_index"]))
         ret = {
             "command": "play_hero_card",
             "result": result,
@@ -36,6 +38,7 @@ def run_command(data):
     print(ret)
     return ret
 
+
 @app.route('/game', websocket=True)
 def run_game():
     ws = simple_websocket.Server(request.environ)
@@ -48,6 +51,7 @@ def run_game():
     except simple_websocket.ConnectionClosed:
         pass
     return ''
+
 
 if __name__ == '__main__':
     app.run()

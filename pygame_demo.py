@@ -19,16 +19,18 @@ networking = True
 if networking:
     ws = simple_websocket.Client('ws://localhost:5000/game')
 
+
 def send_ws_command(cmd):
     print("send_ws_command", cmd)
     if networking:
         ws.send(cmd)
         return ws.receive()
+
+
 def close_network():
     if networking:
         ws.close()
-def init_card_from_repr(card_repr):
-    return SymbolCard(symbols={Symbols[symbol]: count for symbol, count in card_repr.items() if symbol in ("SWORD", "ARROW", "JUMP")}, index=card_repr["index"])
+
 
 def initialize_from_network():
     if networking:
@@ -48,13 +50,18 @@ def initialize_from_network():
             SymbolCard({JUMP: 1})
         ]
         return d
+
+
 """NETWORKING"""
+
 
 class Handle:
     """Grabbable handle on object"""
+
     def __init__(self):
         self.grabbed = False
         self.grab_offset = pygame.Vector2()
+
 
 class MyObject:
     def __init__(self, obj, rect=True, draggable=False):
@@ -70,7 +77,7 @@ class MyObject:
         if draggable:
             self.fields["handle"] = Handle()
         self.children = []
-    
+
     def set_pos(self, p, touched=None):
         if touched is None:
             touched = set()
@@ -81,20 +88,24 @@ class MyObject:
                 ch.set_pos(p + off, touched.union({self}))
         if "parent" in self.fields:
             p, p_off = self.fields["parent"]
-            p.set_pos(pygame.Vector2(self.fields["rect"].x, self.fields["rect"].y) - p_off, touched.union({self}))
+            p.set_pos(pygame.Vector2(
+                self.fields["rect"].x, self.fields["rect"].y) - p_off, touched.union({self}))
 
     def add_child(self, obj, offset):
-        obj.set_pos(pygame.Vector2(self.fields["rect"].x, self.fields["rect"].y) + offset)
+        obj.set_pos(pygame.Vector2(
+            self.fields["rect"].x, self.fields["rect"].y) + offset)
         self.children.append((obj, offset))
         obj.fields["parent"] = (self, offset)
-    
+
     def __repr__(self):
         return f"{self.fields}"
+
 
 class GameView:
     def __init__(self):
         self.game = initialize_from_network()
         self.hero_name = "Ranger"
+
 
 enemy_pos = pygame.Vector2(750, 200)
 discard_pos = pygame.Vector2(900, 600)
@@ -104,29 +115,32 @@ symbol_pos = {
     JUMP: pygame.Vector2(750, 500),
 }
 
+
 class GameState:
     """Global game state"""
+
     def __init__(self):
         self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
         self.object_handles = []
         self.named_objects = {}
         self.game = GameView()
         self.enemy_symbols = []
-        
+
         self.init_objects()
-    
+
     def move_to_hand_position(self, card_obj, i):
         space_between_cards = 125
-        x = (1024 // 2) - 50 - ((space_between_cards * len(self.game.game.heroes[self.game.hero_name].hand)) // 2) + (space_between_cards * i)
+        x = (1024 // 2) - 50 - ((space_between_cards *
+                                 len(self.game.game.heroes[self.game.hero_name].hand)) // 2) + (space_between_cards * i)
         y = 600
         card_obj.set_pos(pygame.Vector2(x, y))
-    
+
     def move_to_play_area_position(self, card_obj, i):
         play_rect = self.named_objects["play_area"].fields["rect"]
         card_offset = 125
         left = play_rect.x + (card_offset * i)
         card_obj.set_pos(pygame.Vector2(left, play_rect.y))
-        
+
     def move_to_discard(self, card_obj):
         card_obj.set_pos(discard_pos)
 
@@ -135,25 +149,30 @@ class GameState:
         for symbol, count in card.symbols.items():
             for i in range(count):
                 symbol_obj = self.add_object(
-                    pygame.transform.scale(pygame.image.load(f"{symbol}.jpg"), (50, 50)),
+                    pygame.transform.scale(
+                        pygame.image.load(f"{symbol}.jpg"), (50, 50)),
                     draggable=True
                 )
-                symbol_obj.set_pos(symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
+                symbol_obj.set_pos(
+                    symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
                 self.enemy_symbols.append(symbol_obj)
 
     def init_objects(self):
-        enemy_board = self.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (250, 100)))
+        enemy_board = self.add_object(pygame.transform.scale(
+            pygame.image.load("playing_board.jpg"), (250, 100)))
         enemy_board.set_pos(pygame.Vector2(650, 400))
 
         self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
-        self.add_object(pygame.Rect(discard_pos.x, discard_pos.y, 100, 150), name="discard")
+        self.add_object(pygame.Rect(
+            discard_pos.x, discard_pos.y, 100, 150), name="discard")
 
         enemy_index = self.game.game.top_enemy().index
         for i, card in enumerate(self.game.game.enemy_deck + [self.game.game.boss]):
             card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(f"{card.name}.jpg"), (100, 150)),
+                pygame.transform.scale(pygame.image.load(
+                    f"{card.name}.jpg"), (100, 150)),
                 draggable=True
-                )
+            )
             card_obj.fields["model"] = card
             card_obj.fields["model_type"] = "enemy"
             if card.index == enemy_index:
@@ -161,9 +180,10 @@ class GameState:
 
         for i, card in enumerate(self.game.game.heroes[self.game.hero_name].hand):
             card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(f"{card.name}.jpg"), (100, 150)),
+                pygame.transform.scale(pygame.image.load(
+                    f"{card.name}.jpg"), (100, 150)),
                 draggable=True
-                )
+            )
             card_obj.fields["hand_index"] = i
             card_obj.fields["model"] = card
             card_obj.fields["model_type"] = "hero_card"
@@ -171,9 +191,10 @@ class GameState:
 
         for i, card in enumerate(self.game.game.heroes[self.game.hero_name].discard):
             card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(f"{card.name}.jpg"), (100, 150)),
+                pygame.transform.scale(pygame.image.load(
+                    f"{card.name}.jpg"), (100, 150)),
                 draggable=True
-                )
+            )
             card_obj.fields["model"] = card
             card_obj.fields["model_type"] = "hero_card"
             self.move_to_discard(card_obj)
@@ -181,9 +202,10 @@ class GameState:
         for i, (_, card) in enumerate(self.game.game.hero_cards_played):
             print("play area", card)
             card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(f"{card.name}.jpg"), (100, 150)),
+                pygame.transform.scale(pygame.image.load(
+                    f"{card.name}.jpg"), (100, 150)),
                 draggable=True
-                )
+            )
             card_obj.fields["hand_index"] = i
             card_obj.fields["model"] = card
             card_obj.fields["model_type"] = "hero_card"
@@ -203,14 +225,17 @@ class GameState:
             obj_rect = obj.fields["rect"]
             if obj_rect.collidepoint(self.mouse_pos):
                 obj_handle = obj.fields["handle"]
-                obj_handle.grab_offset = pygame.Vector2(self.mouse_pos.x - obj_rect.x, self.mouse_pos.y - obj_rect.y)
-                print("mouse", self.mouse_pos, "object", obj_rect, "offset", obj_handle.grab_offset)
+                obj_handle.grab_offset = pygame.Vector2(
+                    self.mouse_pos.x - obj_rect.x, self.mouse_pos.y - obj_rect.y)
+                print("mouse", self.mouse_pos, "object",
+                      obj_rect, "offset", obj_handle.grab_offset)
                 obj_handle.grabbed = True
 
     def handle_action(self, action):
         print("handling", action)
         if action["action"] == "flip_enemy":
-            card = next(c for c in self.object_handles if c.fields.get("model_type", None) == "enemy" and c.fields["model"].index == action["new_enemy_index"])
+            card = next(c for c in self.object_handles if c.fields.get(
+                "model_type", None) == "enemy" and c.fields["model"].index == action["new_enemy_index"])
             self.show_enemy(card.fields["model"], card)
             for o in self.object_handles:
                 if "play_area_index" in o.fields:
@@ -218,10 +243,12 @@ class GameState:
                     self.move_to_discard(o)
         elif action["action"] == "play_card":
             # "entity": card.index,
-            o = next(o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["model"].index == action["entity"])
+            o = next(o for o in self.object_handles if o.fields.get(
+                "model_type", None) == "hero_card" and o.fields["model"].index == action["entity"])
             play_area_index = o.fields.get("play_area_index", None)
             if play_area_index is None:
-                play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
+                play_area_index = o.fields["play_area_index"] = max(
+                    c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
                 del o.fields["hand_index"]
             self.move_to_play_area_position(o, play_area_index)
         else:
@@ -234,29 +261,24 @@ class GameState:
                 o_rect = o.fields["rect"]
                 if o.fields["handle"].grabbed:
                     o.fields["handle"].grabbed = False
-                    if play_rect.colliderect(o_rect) or "play_area_index" in o.fields:
-                        print("play card", play_rect, o_rect)
-
-                        was_played = "play_area_index" in o.fields
-
-                        if not was_played:
-                            data = send_ws_command(json.dumps({
-                                "command": "play_hero_card",
-                                "hero_name": "Ranger",
-                                "card_index": o.fields["model"].index,
-                            }))
-                            response = json.loads(data)
-                            if response["result"] == "error":
-                                continue
-                            else:
-                                for action in response["actions"]:
-                                    self.handle_action(action)
+                    if play_rect.colliderect(o_rect) and not "play_area_index" in o.fields:
+                        data = send_ws_command(json.dumps({
+                            "command": "play_hero_card",
+                            "hero_name": "Ranger",
+                            "card_index": o.fields["model"].index,
+                        }))
+                        response = json.loads(data)
+                        if response["result"] == "error":
+                            continue
+                        else:
+                            for action in response["actions"]:
+                                self.handle_action(action)
                     elif "hand_index" in o.fields:
                         self.move_to_hand_position(o, o.fields["hand_index"])
 
     def update_mouse_pos(self):
         self.mouse_pos.update(pygame.mouse.get_pos())
-        
+
     def step(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -274,12 +296,11 @@ class GameState:
                     self.drop()
 
         state.update_mouse_pos()
-        
+
         for o in self.object_handles:
             if "handle" in o.fields:
                 if o.fields["handle"].grabbed:
                     if "handle" in o.fields and "rect" in o.fields:
-                        o_rect = o.fields["rect"]
                         o_handle = o.fields["handle"]
                         o.set_pos(self.mouse_pos - o_handle.grab_offset)
 
@@ -290,6 +311,7 @@ class GameState:
             elif isinstance(o.fields["object"], pygame.Rect):
                 pygame.draw.rect(screen, "red", o.fields["rect"], width=5)
         pygame.display.flip()
+
 
 state = GameState()
 
