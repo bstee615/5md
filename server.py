@@ -2,8 +2,9 @@ import json
 import jsonpickle
 from flask import Flask, request
 import simple_websocket
+import random
 
-from model import ARROW, SWORD, Game, SymbolCard
+from model import ARROW, JUMP, SWORD, Game, SymbolCard
 app = Flask(__name__)
 
 game = Game()
@@ -12,6 +13,11 @@ hero = game.add_hero("Ranger")
 hero.hand.append(SymbolCard({SWORD: 1}))
 hero.hand.append(SymbolCard({SWORD: 1}))
 hero.hand.append(SymbolCard({ARROW: 1}))
+hero.deck = []
+for s in [SWORD, ARROW, JUMP]:
+    for i in range(10):
+        hero.deck.append(SymbolCard({s: 1}))
+random.shuffle(hero.deck)
 game.add_enemy("Slime", {SWORD: 2})
 game.add_enemy("Skeleton", {ARROW: 1})
 print(game)

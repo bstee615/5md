@@ -109,6 +109,7 @@ class GameView:
 
 enemy_pos = pygame.Vector2(750, 200)
 discard_pos = pygame.Vector2(900, 600)
+deck_pos = pygame.Vector2(100, 600)
 symbol_pos = {
     SWORD: pygame.Vector2(750, 400),
     ARROW: pygame.Vector2(750, 450),
@@ -144,6 +145,9 @@ class GameState:
     def move_to_discard(self, card_obj):
         card_obj.set_pos(discard_pos)
 
+    def move_to_deck(self, card_obj):
+        card_obj.set_pos(deck_pos)
+
     def show_enemy(self, card, card_obj):
         card_obj.set_pos(enemy_pos)
         i = 0
@@ -172,7 +176,9 @@ class GameState:
 
         self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
         self.add_object(pygame.Rect(
-            discard_pos.x, discard_pos.y, 100, 150), name="discard")
+            discard_pos.x, discard_pos.y, 100, 150), name="discard_area")
+        self.add_object(pygame.Rect(
+            deck_pos.x, deck_pos.y, 100, 150), name="deck_area")
 
         enemy_index = self.game.game.top_enemy().index
         for i, card in enumerate(self.game.game.enemy_deck + [self.game.game.boss]):
@@ -195,6 +201,7 @@ class GameState:
             card_obj.fields["hand_index"] = i
             card_obj.fields["model"] = card
             card_obj.fields["model_type"] = "hero_card"
+            card_obj.fields["hero_name"] = self.game.hero_name
             self.move_to_hand_position(card_obj, i)
 
         for i, card in enumerate(self.game.game.heroes[self.game.hero_name].discard):
@@ -205,7 +212,19 @@ class GameState:
             )
             card_obj.fields["model"] = card
             card_obj.fields["model_type"] = "hero_card"
+            card_obj.fields["hero_name"] = self.game.hero_name
             self.move_to_discard(card_obj)
+
+        for i, card in enumerate(self.game.game.heroes[self.game.hero_name].deck):
+            card_obj = self.add_object(
+                pygame.transform.scale(pygame.image.load(
+                    f"{card.name}.jpg"), (100, 150)),
+                draggable=True
+            )
+            card_obj.fields["model"] = card
+            card_obj.fields["model_type"] = "hero_card"
+            card_obj.fields["hero_name"] = self.game.hero_name
+            self.move_to_deck(card_obj)
 
         for i, (_, card) in enumerate(self.game.game.hero_cards_played):
             print("play area", card)
@@ -250,7 +269,6 @@ class GameState:
                     del o.fields["play_area_index"]
                     self.move_to_discard(o)
         elif action["action"] == "play_card":
-            # "entity": card.index,
             o = next(o for o in self.object_handles if o.fields.get(
                 "model_type", None) == "hero_card" and o.fields["model"].index == action["entity"])
             play_area_index = o.fields.get("play_area_index", None)
@@ -259,6 +277,19 @@ class GameState:
                     c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
                 del o.fields["hand_index"]
             self.move_to_play_area_position(o, play_area_index)
+            my_cards = [o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["hero_name"] == action["hero_name"] and "hand_index" in o.fields]
+            my_cards = list(sorted(my_cards, key=lambda o: o.fields["hand_index"]))
+            for i, o in enumerate(my_cards):
+                o.fields["hand_index"] = i
+                self.move_to_hand_position(o, i)
+                    
+        elif action["action"] == "draw_card":
+            o = next(o for o in self.object_handles if o.fields.get(
+                "model_type", None) == "hero_card" and o.fields["model"].index == action["entity"])
+            hand_index = o.fields.get("hand_index", None)
+            if hand_index is None:
+                hand_index = o.fields["hand_index"] = max(c.fields.get("hand_index", -1) for c in self.object_handles) + 1
+            self.move_to_hand_position(o, hand_index)
         else:
             print("unhandled action", action)
 
@@ -276,6 +307,7 @@ class GameState:
                             "card_index": o.fields["model"].index,
                         }))
                         response = json.loads(data)
+                        print("result", response["result"])
                         if response["result"] == "error":
                             continue
                         else:

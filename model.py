@@ -117,6 +117,7 @@ class Game:
         return actions
 
     def play_hero_card(self, hero_name, card_idx):
+        status = None
         hero = self.heroes[hero_name]
         card_idx = next((i for i, c in enumerate(
             hero.hand) if c.index == card_idx), None)
@@ -125,14 +126,23 @@ class Game:
             card = hero.hand.pop(card_idx)
             actions.append({
                 "action": "play_card",
+                "hero_name": hero_name,
                 "entity": card.index,
             })
             self.hero_cards_played.append((hero_name, card))
             actions += self.apply_hero_cards()
-            return "success", actions
-        return "error", [{"action": "revert"}]
+            status = "success"
+            while len(hero.hand) < 3:
+                draw_card = hero.deck.pop(0)
+                hero.hand.append(draw_card)
+                actions.append({"action": "draw_card", "entity": draw_card.index})
+        else:
+            status = "error"
+            actions = [{"action": "revert"}]
+        return status, actions
 
     def apply_hero_cards(self):
+        print("apply_hero_cards")
         actions = []
         top_enemy = self.top_enemy()
 
@@ -140,8 +150,8 @@ class Game:
         for _, card in self.hero_cards_played:
             for symbol, count in card.symbols.items():
                 all_symbols[symbol] += count
-        beat = [count >= top_enemy.symbols.get(
-            symbol, 100) for symbol, count in all_symbols.items()]
+        beat = [all_symbols.get(symbol, -1) >= count for symbol, count in top_enemy.symbols.items()]
+        print(beat, top_enemy.symbols, all_symbols)
         if len(beat) > 0 and all(beat):
             actions += self.defeat_enemy()
 
