@@ -1,4 +1,5 @@
 import json
+from turtle import back
 import jsonpickle
 import sys
 import traceback
@@ -10,6 +11,7 @@ pygame.init()
 
 size = width, height = 1024, 768
 background = pygame.image.load("bg.png")
+win = pygame.image.load("win.png")
 
 screen = pygame.display.set_mode(size)
 
@@ -120,6 +122,7 @@ class GameState:
         self.object_handles = []
         self.named_objects = {}
         self.enemy_symbols = []
+        self.won = False
 
         game = initialize_from_network()
         self.init_objects(game, "Ranger")
@@ -291,6 +294,8 @@ class GameState:
                     "area": "hand",
                     "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
                 }
+        elif action["action"] == "win":
+            self.won = True
         else:
             print("unhandled action", action)
 
@@ -326,7 +331,8 @@ class GameState:
                 self.move_card_to(o, p)
 
     def step(self):
-        for event in pygame.event.get():
+        step_events = pygame.event.get()
+        for event in step_events:
             if event.type == pygame.QUIT:
                 close_network()
                 sys.exit()
@@ -340,6 +346,11 @@ class GameState:
                 left, middle, right = pygame.mouse.get_pressed()
                 if not left:
                     self.drop()
+        
+        if self.won:
+            screen.blit(win, (0, 0))
+            pygame.display.flip()
+            return
 
         state.update_mouse_pos()
 

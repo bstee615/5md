@@ -111,6 +111,9 @@ class Game:
             self.enemy_deck.pop(0)
             actions.append(
                 {"action": "flip_enemy", "new_enemy_index": self.top_enemy().index})
+        else:
+            actions.append(
+                {"action": "win"})
         for hero_name, card in self.hero_cards_played:
             self.heroes[hero_name].discard.append(card)
         self.hero_cards_played = []
