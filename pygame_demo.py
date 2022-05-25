@@ -59,6 +59,7 @@ class Handle:
     """Grabbable handle on object"""
 
     def __init__(self):
+        self.draggable = True
         self.grabbed = False
         self.grab_offset = pygame.Vector2()
 
@@ -129,18 +130,22 @@ class GameState:
         x = ((1024 // 2) - 50 - ((space_between_cards * num_cards_in_hand) // 2) + (space_between_cards * i))
         y = 600
         card_obj.set_pos(pygame.Vector2(x, y))
+        card_obj.fields["handle"].draggable = True
 
     def move_to_play_area_position(self, card_obj, i):
         play_rect = self.named_objects["play_area"].fields["rect"]
         card_offset = 125
         left = play_rect.x + (card_offset * i)
         card_obj.set_pos(pygame.Vector2(left, play_rect.y))
+        card_obj.fields["handle"].draggable = True
 
     def move_to_discard(self, card_obj):
         card_obj.set_pos(discard_pos)
+        card_obj.fields["handle"].draggable = False
 
     def move_to_deck(self, card_obj):
         card_obj.set_pos(deck_pos)
+        card_obj.fields["handle"].draggable = False
 
     def show_enemy(self, card_obj):
         card_obj.set_pos(enemy_pos)
