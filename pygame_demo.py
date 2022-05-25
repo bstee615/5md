@@ -95,6 +95,7 @@ class GameView:
         self.game = initialize_from_network()
         self.hero_name = "Ranger"
 
+enemy_pos = pygame.Vector2(750, 200)
 class GameState:
     """Global game state"""
     def __init__(self):
@@ -117,11 +118,23 @@ class GameState:
         left = play_rect.x + (card_offset * i)
         card_obj.set_pos(pygame.Vector2(left, play_rect.y))
 
+    def show_enemy(self, card, card_obj):
+        card_obj.set_pos(enemy_pos)
     def init_objects(self):
         enemy_board = self.add_object(pygame.transform.scale(pygame.image.load("playing_board.jpg"), (250, 100)))
         enemy_board.set_pos(pygame.Vector2(650, 400))
 
         self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
+
+        enemy_index = self.game.game.top_enemy().index
+        for i, card in enumerate(self.game.game.enemy_deck):
+            card_obj = self.add_object(
+                pygame.transform.scale(pygame.image.load(f"{card.name}.jpg"), (100, 150)),
+                draggable=True
+                )
+            card_obj.fields["model"] = card
+            if card.index == enemy_index:
+                self.show_enemy(card, card_obj)
 
         for i, card in enumerate(self.game.game.heroes[self.game.hero_name].hand):
             card_obj = self.add_object(

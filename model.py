@@ -40,8 +40,12 @@ class ActionCard(HeroCard):
         super().__init__(None)
         pass
 
+enemy_global_index = 0
 class EnemyCard:
     def __init__(self, name, symbols) -> None:
+        global enemy_global_index
+        self.index = enemy_global_index
+        enemy_global_index += 1
         self.name = name
         self.symbols = symbols
 
@@ -56,6 +60,9 @@ class EnemyCard:
 
 class BossCard:
     def __init__(self, name, symbols) -> None:
+        global enemy_global_index
+        self.index = enemy_global_index
+        enemy_global_index += 1
         self.name = name
         self.symbols = symbols
 
