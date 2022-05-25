@@ -1,5 +1,7 @@
+from calendar import c
 from collections import defaultdict
 from enum import Enum
+import json
 
 class Symbols(Enum):
     SWORD = 1
@@ -8,30 +10,46 @@ class Symbols(Enum):
 
 card_global_index = 0
 class HeroCard:
-    def __init__(self) -> None:
-        global card_global_index
-        self.index = card_global_index
-        card_global_index += 1
+    def __init__(self, index) -> None:
+        if index is None:
+            global card_global_index
+            self.index = card_global_index
+            card_global_index += 1
+        else:
+            self.index = index
 
 class SymbolCard(HeroCard):
-    def __init__(self, symbols) -> None:
-        super().__init__()
+    def __init__(self, symbols, index=None):
+        super().__init__(index)
         self.symbols = symbols
         self.name = ",".join(f"{symbol.name}={count}" for symbol, count in self.symbols.items())
     
+    def view(self):
+        d = {symbol.name: count for symbol, count in self.symbols.items()}
+        d.update({
+            "index": self.index,
+            "name": self.name,
+        })
+        return d
+
     def __repr__(self):
-        simple_dict = {symbol.name: count for symbol, count in self.symbols.items()}
-        return f"{self.name}(id={self.index}, {simple_dict})"
+        return json.dumps(self.view())
 
 class ActionCard(HeroCard):
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self):
+        super().__init__(None)
         pass
 
 class EnemyCard:
     def __init__(self, name, symbols) -> None:
         self.name = name
         self.symbols = symbols
+
+    def view(self):
+        return {
+            "name": self.name,
+            "symbols": self.symbols,
+        }
     
     def __repr__(self) -> str:
         return f"{self.name}(symbols={self.symbols})"
@@ -40,6 +58,12 @@ class BossCard:
     def __init__(self, name, symbols) -> None:
         self.name = name
         self.symbols = symbols
+
+    def view(self):
+        return {
+            "name": self.name,
+            "symbols": self.symbols,
+        }
     
     def __repr__(self) -> str:
         return f"{self.name}(symbols={self.symbols})"
@@ -50,6 +74,14 @@ class Hero:
         self.deck = []
         self.discard = []
         self.hand = []
+
+    def view(self):
+        return {
+            "name": self.name,
+            "deck": [c.view() for c in self.deck],
+            "discard": [c.view() for c in self.discard],
+            "hand": [c.view() for c in self.hand],
+        }
     
     def __repr__(self) -> str:
         return f"{self.name}(hand={self.hand}, deck={self.deck}, discard={self.discard})"
@@ -61,6 +93,17 @@ class Game:
         self.enemy_deck = []
         self.timer = None
         self.hero_cards_played = []
+    
+    def view(self):
+        return {
+            "boss": self.boss.view(),
+            "heroes": {
+                name: data.view()
+                for name, data in self.heroes.items()
+            },
+            "enemy_deck": [c.view() for c in self.enemy_deck],
+            "hero_cards_played": [c.view() for c in self.hero_cards_played]
+        }
     
     def init_boss(self, name):
         if name == "Baby Barbarian":
@@ -95,12 +138,15 @@ class Game:
             self.enemy_deck.pop(0)
         self.hero_cards_played = []
 
-    def play_hero_card(self, hero_name, card_name):
+    def play_hero_card(self, hero_name, card_idx):
         hero = self.heroes[hero_name]
-        card_idx = next(i for i, c in enumerate(hero.hand) if c.name == card_name)
-        card = hero.hand.pop(card_idx)
-        self.hero_cards_played.append(card)
-        self.apply_hero_cards()
+        card_idx = next((i for i, c in enumerate(hero.hand) if c.index == card_idx), None)
+        if card_idx is not None:
+            card = hero.hand.pop(card_idx)
+            self.hero_cards_played.append(card)
+            self.apply_hero_cards()
+            return "success"
+        return "error"
     
     def apply_hero_cards(self):
         top_enemy = self.top_enemy()
@@ -109,7 +155,7 @@ class Game:
         for card in self.hero_cards_played:
             for symbol, count in card.symbols.items():
                 all_symbols[symbol] += count
-        if all(count >= top_enemy.symbols[symbol] for symbol, count in all_symbols.items()):
+        if all(count >= top_enemy.symbols.get(symbol, -1) for symbol, count in all_symbols.items()):
             self.defeat_enemy()
     
     def __repr__(self):

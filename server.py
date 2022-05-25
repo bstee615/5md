@@ -1,3 +1,4 @@
+import jsonpickle
 from flask import Flask, request
 import simple_websocket
 
@@ -17,7 +18,13 @@ def run_command(command):
     command_split = command.split()
     print(f"command {command_split}")
     if command_split[0] == "play_hero_card":
-        game.play_hero_card(command_split[1], command_split[2])
+        result = game.play_hero_card(command_split[1], int(command_split[2]))
+        return f"play_hero_card {result}"
+    # elif command_split[0] == "list_cards":
+    #     hero = game.heroes[command_split[1]]
+    #     return f"{command_split[0]} {json.dumps([c.to_dict() for c in hero.hand])}"
+    elif command_split[0] == "init":
+        return jsonpickle.encode(game)
     print(game)
 
 @app.route('/game', websocket=True)
@@ -26,7 +33,9 @@ def run_game():
     try:
         while True:
             data = ws.receive()
-            run_command(data)
+            response = run_command(data)
+            print(f"{response=}")
+            ws.send(response)
     except simple_websocket.ConnectionClosed:
         pass
     return ''

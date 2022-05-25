@@ -1,8 +1,10 @@
+import jsonpickle
 import sys
+import traceback
 import pygame
 import simple_websocket
 
-from model import SymbolCard, Symbols
+from model import Game, SymbolCard, Symbols
 pygame.init()
 
 size = width, height = 1024, 768
@@ -11,7 +13,7 @@ background = pygame.image.load("bg.png")
 screen = pygame.display.set_mode(size)
 
 """NETWORKING"""
-networking = False
+networking = True
 
 if networking:
     ws = simple_websocket.Client('ws://localhost:5000/game')
@@ -19,10 +21,27 @@ if networking:
 def send_ws_command(cmd):
     print("send_ws_command", cmd)
     if networking:
-        ws.send(cmd)
+        return ws.send(cmd)
 def close_network():
     if networking:
         ws.close()
+def init_card_from_repr(card_repr):
+    return SymbolCard(symbols={Symbols[symbol]: count for symbol, count in card_repr.items() if symbol in ("SWORD", "ARROW", "JUMP")}, index=card_repr["index"])
+
+def initialize_from_network():
+    if networking:
+        ws.send(f"init")
+        return jsonpickle.decode(ws.receive())
+    else:
+        # Dummy data
+        d = Game()
+        ranger = d.add_hero("Ranger")
+        ranger.hand += [
+            SymbolCard({Symbols.SWORD: 1}),
+            SymbolCard({Symbols.ARROW: 1}),
+            SymbolCard({Symbols.JUMP: 1})
+        ]
+        return d
 """NETWORKING"""
 
 class Handle:
@@ -66,14 +85,10 @@ class MyObject:
     def __repr__(self):
         return f"{self.fields}"
 
-class GameModel:
+class GameView:
     def __init__(self):
-        self.cards = [
-            SymbolCard({Symbols.SWORD: 1}),
-            SymbolCard({Symbols.ARROW: 1}),
-            SymbolCard({Symbols.JUMP: 1})
-        ]
-        self.play_area_cards = []
+        self.game = initialize_from_network()
+        self.hero_name = "Ranger"
 
 class GameState:
     """Global game state"""
@@ -81,13 +96,13 @@ class GameState:
         self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
         self.object_handles = []
         self.named_objects = {}
-        self.model = GameModel()
+        self.game = GameView()
         
         self.init_objects()
     
     def move_to_hand_position(self, card_obj, i):
         space_between_cards = 125
-        x = (1024 // 2) - 50 - ((space_between_cards * len(self.model.cards)) // 2) + (space_between_cards * i)
+        x = (1024 // 2) - 50 - ((space_between_cards * len(self.game.game.heroes[self.game.hero_name].hand)) // 2) + (space_between_cards * i)
         y = 600
         card_obj.set_pos(pygame.Vector2(x, y))
     
@@ -103,7 +118,7 @@ class GameState:
 
         self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
 
-        for i, card in enumerate(self.model.cards):
+        for i, card in enumerate(self.game.game.heroes[self.game.hero_name].hand):
             card_obj = self.add_object(
                 pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)),
                 draggable=True
@@ -144,8 +159,10 @@ class GameState:
                     if play_rect.colliderect(o_rect) or "play_area_index" in o.fields:
                         print("play card", play_rect, o_rect)
                         if "play_area_index" not in o.fields:
-                            card_str = repr(o.fields["model"])
-                            send_ws_command(f"play_hero_card Ranger {card_str}")
+                            card_str = o.fields["model"].index
+                            response = send_ws_command(f"play_hero_card Ranger {card_str}")
+                            if response == "error":
+                                continue
                         play_area_index = o.fields.get("play_area_index", None)
                         if play_area_index is None:
                             play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
@@ -191,4 +208,8 @@ class GameState:
 state = GameState()
 
 while 1:
-    state.step()
+    try:
+        state.step()
+    except Exception:
+        traceback.print_exc()
+        exit(1)
