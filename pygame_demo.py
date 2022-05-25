@@ -138,16 +138,22 @@ class GameState:
 
         for i, card in enumerate(self.game.game.heroes[self.game.hero_name].hand):
             card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load("card_king_hearts.jpg"), (100, 150)),
+                pygame.transform.scale(pygame.image.load(f"{card.name}.jpg"), (100, 150)),
                 draggable=True
                 )
             card_obj.fields["hand_index"] = i
             card_obj.fields["model"] = card
             self.move_to_hand_position(card_obj, i)
 
-        p1 = self.add_object(pygame.Rect(50, 50, 50, 50))
-        p2 = self.add_object(pygame.Rect((1024 // 2) - 25, 50, 50, 50))
-        p3 = self.add_object(pygame.Rect(1024 - 50 - 50, 50, 50, 50))
+        for i, card in enumerate(self.game.game.hero_cards_played):
+            print("play area", card)
+            card_obj = self.add_object(
+                pygame.transform.scale(pygame.image.load(f"{card.name}.jpg"), (100, 150)),
+                draggable=True
+                )
+            card_obj.fields["hand_index"] = i
+            card_obj.fields["model"] = card
+            self.move_to_play_area_position(card_obj, i)
 
     def add_object(self, obj, name=None, **kwargs):
         my_obj = MyObject(obj, **kwargs)
