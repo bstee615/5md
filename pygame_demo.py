@@ -216,6 +216,14 @@ class GameState:
                 if "play_area_index" in o.fields:
                     del o.fields["play_area_index"]
                     self.move_to_discard(o)
+        elif action["action"] == "play_card":
+            # "entity": card.index,
+            o = next(o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["model"].index == action["entity"])
+            play_area_index = o.fields.get("play_area_index", None)
+            if play_area_index is None:
+                play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
+                del o.fields["hand_index"]
+            self.move_to_play_area_position(o, play_area_index)
         else:
             print("unhandled action", action)
 
@@ -230,12 +238,6 @@ class GameState:
                         print("play card", play_rect, o_rect)
 
                         was_played = "play_area_index" in o.fields
-
-                        play_area_index = o.fields.get("play_area_index", None)
-                        if play_area_index is None:
-                            play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
-                            del o.fields["hand_index"]
-                        self.move_to_play_area_position(o, play_area_index)
 
                         if not was_played:
                             data = send_ws_command(json.dumps({

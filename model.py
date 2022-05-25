@@ -115,10 +115,7 @@ class Game:
             card = hero.hand.pop(card_idx)
             actions.append({
                 "action": "play_card",
-                "player_name": hero_name,
                 "entity": card.index,
-                "from": "hand",
-                "to": "play_area",
             })
             self.hero_cards_played.append((hero_name, card))
             actions += self.apply_hero_cards()
