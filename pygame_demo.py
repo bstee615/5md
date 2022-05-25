@@ -188,6 +188,8 @@ class GameState:
                         if play_area_index is None:
                             play_area_index = o.fields["play_area_index"] = max(c.fields.get("play_area_index", -1) for c in self.object_handles) + 1
                         self.move_to_play_area_position(o, play_area_index)
+                    elif "hand_index" in o.fields:
+                        self.move_to_hand_position(o, o.fields["hand_index"])
 
     def update_mouse_pos(self):
         self.mouse_pos.update(pygame.mouse.get_pos())
