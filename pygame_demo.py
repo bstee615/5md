@@ -146,6 +146,13 @@ class GameState:
 
     def show_enemy(self, card, card_obj):
         card_obj.set_pos(enemy_pos)
+        i = 0
+        while i < len(self.object_handles):
+            if "model_type" in self.object_handles[i].fields and self.object_handles[i].fields["model_type"] == "symbol":
+                self.object_handles.pop(i)
+            else:
+                i += 1
+        self.enemy_symbols = []
         for symbol, count in card.symbols.items():
             for i in range(count):
                 symbol_obj = self.add_object(
@@ -155,6 +162,7 @@ class GameState:
                 )
                 symbol_obj.set_pos(
                     symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
+                symbol_obj.fields["model_type"] = "symbol"
                 self.enemy_symbols.append(symbol_obj)
 
     def init_objects(self):
