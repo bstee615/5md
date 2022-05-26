@@ -61,6 +61,7 @@ def run_command(data):
 def run_game():
     ws = simple_websocket.Server(request.environ)
     wsi = len(wss)
+    wss.append(ws)
     try:
         while True:
             data = ws.receive()
