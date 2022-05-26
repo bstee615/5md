@@ -1,43 +1,66 @@
 import json
-from turtle import back
 import jsonpickle
 import sys
 import traceback
 import pygame
 import simple_websocket
+import time
+from multiprocessing import Process, Queue
 
 from model import ARROW, JUMP, SWORD, Game, SymbolCard
-pygame.init()
-
-size = width, height = 1024, 768
-background = pygame.image.load("bg.png")
-win = pygame.image.load("win.png")
-
-screen = pygame.display.set_mode(size)
 
 """NETWORKING"""
 networking = True
 
-if networking:
+def worker(recv_q, send_q):
+    """
+    Worker process for corralling input/output messages.
+    recv_q is a queue of output messages received from the server.
+    send_q is a queue of messages which we should send to the server.
+
+    The worker runs in a non-blocking loop to receive and enqueue all messages,
+    then dequeue and send all required messages.
+    This process should be joined at close to ensure that cleanup happens.
+    """
     ws = simple_websocket.Client('ws://localhost:5000/game')
+    while True:
+        try:
+            data = ws.receive(0)
+        except simple_websocket.ws.ConnectionClosed:
+            break
+        if data:
+            print(f"{data=}")
+            recv_q.put(data)
+        while not send_q.empty():
+            cmd = send_q.get()
+            if cmd == "close":
+                ws.close()
+                break
+            ws.send(cmd)
+    ws.close()
 
 
-def send_ws_command(cmd):
+def wait_for_data():
+    while recv_q.empty():
+        pass
+    return recv_q.get()
+
+def send_ws_command(cmd, wait_for_response=True):
     print("send_ws_command", cmd)
     if networking:
-        ws.send(cmd)
-        return ws.receive()
-
+        send_q.put(cmd)
+        if wait_for_response:
+            return wait_for_data()
 
 def close_network():
     if networking:
-        ws.close()
+        send_ws_command("close", wait_for_response=False)
+        p.join()
 
 
 def initialize_from_network():
     if networking:
-        ws.send(jsonpickle.encode({"command": "init"}))
-        data = ws.receive()
+        data = send_ws_command(jsonpickle.encode({"command": "init"}))
         print("data =", repr(data))
         response = json.loads(data)
         print("response =", response)
@@ -102,16 +125,6 @@ class MyObject:
 
     def __repr__(self):
         return f"{self.fields}"
-
-
-enemy_pos = pygame.Vector2(750, 200)
-discard_pos = pygame.Vector2(900, 600)
-deck_pos = pygame.Vector2(100, 600)
-symbol_pos = {
-    SWORD: pygame.Vector2(750, 400),
-    ARROW: pygame.Vector2(750, 450),
-    JUMP: pygame.Vector2(750, 500),
-}
 
 
 class GameState:
@@ -353,6 +366,12 @@ class GameState:
             return
 
         state.update_mouse_pos()
+        
+        if not recv_q.empty():
+            response = json.loads(recv_q.get())
+            for action in response["actions"]:
+                self.handle_action(action)
+            self.update_card_pos()
 
         for o in self.object_handles:
             if "handle" in o.fields:
@@ -370,12 +389,37 @@ class GameState:
         pygame.display.flip()
 
 
-state = GameState()
+if __name__ == "__main__":
+    pygame.init()
 
-while 1:
-    try:
-        state.step()
-    except Exception:
-        traceback.print_exc()
-        close_network()
-        exit(1)
+    size = width, height = 1024, 768
+    background = pygame.image.load("bg.png")
+    win = pygame.image.load("win.png")
+
+    enemy_pos = pygame.Vector2(750, 200)
+    discard_pos = pygame.Vector2(900, 600)
+    deck_pos = pygame.Vector2(100, 600)
+    symbol_pos = {
+        SWORD: pygame.Vector2(750, 400),
+        ARROW: pygame.Vector2(750, 450),
+        JUMP: pygame.Vector2(750, 500),
+    }
+
+    screen = pygame.display.set_mode(size)
+
+    # Turn-on the worker thread.
+    if networking:
+        recv_q = Queue()
+        send_q = Queue()
+
+        p = Process(target=worker, args=(recv_q, send_q))
+        p.start()
+
+    state = GameState()
+    while 1:
+        try:
+            state.step()
+        except Exception:
+            traceback.print_exc()
+            close_network()
+            exit(1)
