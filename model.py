@@ -138,7 +138,7 @@ class Game:
             while len(hero.hand) < 3:
                 draw_card = hero.deck.pop(0)
                 hero.hand.append(draw_card)
-                actions.append({"action": "draw_card", "entity": draw_card.index})
+                actions.append({"action": "draw_card", "hero_name": hero_name, "entity": draw_card.index})
         else:
             status = "error"
             actions = [{"action": "revert"}]

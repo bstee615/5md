@@ -4,13 +4,15 @@ import sys
 import traceback
 import pygame
 import simple_websocket
-import time
 from multiprocessing import Process, Queue
+import sys
 
 from model import ARROW, JUMP, SWORD, Game, SymbolCard
 
 """NETWORKING"""
 networking = True
+if len(sys.argv) > 1:
+    hero_name = sys.argv[1]
 
 def worker(recv_q, send_q):
     """
@@ -68,12 +70,15 @@ def initialize_from_network():
     else:
         # Dummy data
         d = Game()
-        ranger = d.add_hero("Ranger")
+        d.init_boss("Baby Barbarian")
+        ranger = d.add_hero(hero_name)
         ranger.hand += [
             SymbolCard({SWORD: 1}),
             SymbolCard({ARROW: 1}),
             SymbolCard({JUMP: 1})
         ]
+        d.add_enemy("Slime", {SWORD: 2})
+        d.add_enemy("Skeleton", {ARROW: 1})
         return d
 
 
@@ -138,7 +143,7 @@ class GameState:
         self.won = False
 
         game = initialize_from_network()
-        self.init_objects(game, "Ranger")
+        self.init_objects(game, hero_name)
 
     def move_card_to(self, card_obj, position):
         if position["area"] == "hand":
@@ -287,26 +292,30 @@ class GameState:
             for o in play_stuff:
                 o.fields["position"] = {"area": "discard"}
         elif action["action"] == "play_card":
-            o = next(o for o in self.object_handles if o.fields.get(
-                "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
-            play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
-            o.fields["position"] = {
-                "area": "play_area",
-                "index": max(o.fields["position"]["index"] for o in play_stuff) + 1 if len(play_stuff) > 0 else 0,
-            }
-            hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
-            hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
-            for i, o in enumerate(hand_stuff):
-                o.fields["position"]["index"] = i
-        elif action["action"] == "draw_card":
-            o = next(o for o in self.object_handles if o.fields.get(
-                "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
-            if o.fields.get("position", {"area": None})["area"] != "hand":
-                hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
+            if action["hero_name"] == hero_name:
+                o = next(o for o in self.object_handles if o.fields.get(
+                    "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
+                play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
                 o.fields["position"] = {
-                    "area": "hand",
-                    "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
+                    "area": "play_area",
+                    "index": max(o.fields["position"]["index"] for o in play_stuff) + 1 if len(play_stuff) > 0 else 0,
                 }
+                hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
+                hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
+                for i, o in enumerate(hand_stuff):
+                    o.fields["position"]["index"] = i
+            # TODO: else
+        elif action["action"] == "draw_card":
+            if action["hero_name"] == hero_name:
+                o = next(o for o in self.object_handles if o.fields.get(
+                    "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
+                if o.fields.get("position", {"area": None})["area"] != "hand":
+                    hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
+                    o.fields["position"] = {
+                        "area": "hand",
+                        "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
+                    }
+            # TODO: else
         elif action["action"] == "win":
             self.won = True
         else:
@@ -322,7 +331,7 @@ class GameState:
                     if play_rect.colliderect(o_rect) and o.fields.get("position", {"area": None})["area"] == "hand":
                         data = send_ws_command(json.dumps({
                             "command": "play_hero_card",
-                            "hero_name": "Ranger",
+                            "hero_name": hero_name,
                             "card_index": o.fields["index"],
                         }))
                         response = json.loads(data)
@@ -367,11 +376,12 @@ class GameState:
 
         state.update_mouse_pos()
         
-        if not recv_q.empty():
-            response = json.loads(recv_q.get())
-            for action in response["actions"]:
-                self.handle_action(action)
-            self.update_card_pos()
+        if networking:
+            if not recv_q.empty():
+                response = json.loads(recv_q.get())
+                for action in response["actions"]:
+                    self.handle_action(action)
+                self.update_card_pos()
 
         for o in self.object_handles:
             if "handle" in o.fields:

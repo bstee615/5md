@@ -9,12 +9,18 @@ app = Flask(__name__)
 
 game = Game()
 game.init_boss("Baby Barbarian")
+hero = game.add_hero("Barbarian")
+hero.hand.append(SymbolCard({SWORD: 1}))
+hero.hand.append(SymbolCard({JUMP: 1}))
+hero.deck = []
+for s in [SWORD, JUMP]:
+    for i in range(10):
+        hero.deck.append(SymbolCard({s: 1}))
 hero = game.add_hero("Ranger")
-hero.hand.append(SymbolCard({SWORD: 1}))
-hero.hand.append(SymbolCard({SWORD: 1}))
+hero.hand.append(SymbolCard({ARROW: 1}))
 hero.hand.append(SymbolCard({ARROW: 1}))
 hero.deck = []
-for s in [SWORD, ARROW, JUMP]:
+for s in [ARROW]:
     for i in range(10):
         hero.deck.append(SymbolCard({s: 1}))
 random.shuffle(hero.deck)
