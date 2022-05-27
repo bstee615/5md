@@ -81,14 +81,18 @@ def run_game():
         hero = make_barb()
     if wsi == 1:
         hero = make_ranger()
-    for s in wss:
+    for i, s in enumerate(wss):
         if s is not None:
-            s.send(json.dumps({
-                "actions": [{
-                    "action": "player_join",
-                    "hero": jsonpickle.encode(hero),
-                }],
-            }))
+            try:
+                s.send(json.dumps({
+                    "actions": [{
+                        "action": "player_join",
+                        "hero": jsonpickle.encode(hero),
+                    }],
+                }))
+            except ConnectionResetError:
+                print("client", i, "disconnected")
+                wss[i] = None
     wss.append(ws)
     try:
         while True:
@@ -97,10 +101,12 @@ def run_game():
             print(f"{response=}")
             if send_to_all:
                 for i, s in enumerate(wss):
-                    if s is not None:
-                        print("send to other client", i)
-                        s.send(response)
-                # TODO: Handle client disconnect and cleanup
+                    try:
+                        if s is not None:
+                            print("send to other client", i)
+                            s.send(response)
+                    except ConnectionResetError:
+                        print("client", i, "disconnected")
             else:
                 print("send to requesting client", wsi)
                 ws.send(response)
