@@ -1,4 +1,6 @@
+from collections import defaultdict
 import json
+import random
 import jsonpickle
 import sys
 import traceback
@@ -137,6 +139,12 @@ class MyObject:
             self.fields["rect"].x, self.fields["rect"].y) + offset)
         self.children.append((obj, offset))
         obj.fields["parent"] = (self, offset)
+    
+    def set_text(self, text):
+        r = self.fields["rect"]
+        self.fields["object"] = t = font.render(text, True, BLUE)
+        self.fields["rect"] = t.get_rect()
+        self.set_pos(pygame.Vector2(r.x, r.y))
 
     def __repr__(self):
         return f"{self.fields}"
@@ -170,12 +178,10 @@ class GameState:
             card_obj.set_pos(pygame.Vector2(left, play_rect.y))
             card_obj.fields["handle"].draggable = True
         elif position["area"] == "discard":
-            r = self.named_objects["discard_area"].fields["rect"]
-            card_obj.set_pos(pygame.Vector2(r.x, r.y))
+            card_obj.set_pos(discard_pos)
             card_obj.fields["handle"].draggable = False
         elif position["area"] == "deck":
-            r = self.named_objects["deck_area"].fields["rect"]
-            card_obj.set_pos(pygame.Vector2(r.x, r.y))
+            card_obj.set_pos(deck_pos)
             card_obj.fields["handle"].draggable = False
         elif position["area"] == "other_hero_hand":
             base_pos = other_hero_pos[position["hero_name"]]
@@ -220,10 +226,6 @@ class GameState:
         enemy_board.set_pos(pygame.Vector2(650, 400))
 
         self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
-        self.add_object(pygame.Rect(
-            discard_pos.x, discard_pos.y, 100, 150), name="discard_area")
-        self.add_object(pygame.Rect(
-            deck_pos.x, deck_pos.y, 100, 150), name="deck_area")
 
         enemy_index = game.top_enemy().index
         for i, card in enumerate(game.enemy_deck + [game.boss]):
@@ -237,6 +239,8 @@ class GameState:
             card_obj.fields["symbols"] = card.symbols
             if card.index == enemy_index:
                 self.init_enemy(card_obj)
+            else:
+                card_obj.set_pos(enemy_pos)
         for other_hero_name, other_hero in [(n, h) for n, h in game.heroes.items() if n != hero_name]:
             print("other hero", other_hero_name, other_hero)
             for i, card in enumerate(game.heroes[other_hero_name].hand):
@@ -272,6 +276,8 @@ class GameState:
             card_obj.fields["model_type"] = "hero_card"
             card_obj.fields["hero_name"] = hero_name
             card_obj.fields["visible"] = False
+        player_discard = self.add_object(font.render(str(len(game.heroes[hero_name].discard)), True, BLUE), "player_discard")
+        player_discard.set_pos(discard_pos)
 
         for i, card in enumerate(game.heroes[hero_name].deck):
             card_obj = self.add_object(
@@ -284,6 +290,8 @@ class GameState:
             card_obj.fields["model_type"] = "hero_card"
             card_obj.fields["hero_name"] = hero_name
             card_obj.fields["visible"] = False
+        player_deck = self.add_object(font.render(str(len(game.heroes[hero_name].deck)), True, BLUE), "player_deck")
+        player_deck.set_pos(deck_pos)
 
         for i, (_, card) in enumerate(game.hero_cards_played):
             print("play area", card)
@@ -389,9 +397,13 @@ class GameState:
     
     def update_card_pos(self):
         print("update_card_pos")
+        counts = defaultdict(int)
         for o in self.object_handles:
             if (p := o.fields.get("position", None)) is not None:
                 self.move_card_to(o, p)
+                counts[p["area"]] += 1
+        self.named_objects["player_discard"].set_text(str(counts["discard"]))
+        self.named_objects["player_deck"].set_text(str(counts["deck"]))
 
     def step(self):
         step_events = pygame.event.get()
@@ -448,6 +460,10 @@ if __name__ == "__main__":
     size = width, height = 1024, 768
     background = pygame.image.load("bg.png")
     win = pygame.image.load("win.png")
+    font = pygame.font.SysFont(None, 24)
+    RED = (255, 0, 0)
+    GREEN = (0, 255, 0)
+    BLUE = (0, 0, 255)
 
     enemy_pos = pygame.Vector2(750, 200)
     discard_pos = pygame.Vector2(900, 600)
