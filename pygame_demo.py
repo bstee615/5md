@@ -10,9 +10,12 @@ import sys
 from model import ARROW, JUMP, SWORD, Game, SymbolCard
 
 """NETWORKING"""
-networking = True
 if len(sys.argv) > 1:
     hero_name = sys.argv[1]
+if len(sys.argv) > 2:
+    networking = sys.argv[2] != "no"
+else:
+    networking = True
 
 def worker(recv_q, send_q):
     """
@@ -77,6 +80,12 @@ def initialize_from_network():
             SymbolCard({ARROW: 1}),
             SymbolCard({JUMP: 1})
         ]
+        ranger.deck += [
+            *([SymbolCard({SWORD: 1})] * 5),
+            *([SymbolCard({ARROW: 1})] * 5),
+            *([SymbolCard({JUMP: 1})] * 5),
+        ]
+        random.shuffle(ranger.deck)
         d.add_enemy("Slime", {SWORD: 2})
         d.add_enemy("Skeleton", {ARROW: 1})
         return d
