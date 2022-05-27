@@ -9,23 +9,30 @@ app = Flask(__name__)
 
 game = Game()
 game.init_boss("Baby Barbarian")
-hero = game.add_hero("Barbarian")
-hero.hand.append(SymbolCard({SWORD: 1}))
-hero.hand.append(SymbolCard({JUMP: 1}))
-hero.deck = []
-for s in [SWORD, JUMP]:
-    for i in range(10):
-        hero.deck.append(SymbolCard({s: 1}))
-hero = game.add_hero("Ranger")
-hero.hand.append(SymbolCard({ARROW: 1}))
-hero.hand.append(SymbolCard({ARROW: 1}))
-hero.deck = []
-for s in [ARROW]:
-    for i in range(10):
-        hero.deck.append(SymbolCard({s: 1}))
-random.shuffle(hero.deck)
 game.add_enemy("Slime", {SWORD: 2})
 game.add_enemy("Skeleton", {ARROW: 1})
+
+def make_barb():
+    hero = game.add_hero("Barbarian")
+    hero.hand.append(SymbolCard({SWORD: 1}))
+    hero.hand.append(SymbolCard({JUMP: 1}))
+    hero.deck = []
+    for s in [SWORD, JUMP]:
+        for i in range(5):
+            hero.deck.append(SymbolCard({s: 1}))
+    random.shuffle(hero.deck)
+    return hero
+def make_ranger():
+    hero = game.add_hero("Ranger")
+    hero.hand.append(SymbolCard({ARROW: 1}))
+    hero.hand.append(SymbolCard({ARROW: 1}))
+    hero.deck = []
+    for s in [ARROW]:
+        for i in range(10):
+            hero.deck.append(SymbolCard({s: 1}))
+    random.shuffle(hero.deck)
+    return hero
+
 print(game)
 
 """
@@ -67,6 +74,18 @@ def run_command(data):
 def run_game():
     ws = simple_websocket.Server(request.environ)
     wsi = len(wss)
+    if wsi == 0:
+        hero = make_barb()
+    if wsi == 1:
+        hero = make_ranger()
+    for s in wss:
+        if s is not None:
+            s.send(json.dumps({
+                "actions": [{
+                    "action": "player_join",
+                    "hero": jsonpickle.encode(hero),
+                }],
+            }))
     wss.append(ws)
     try:
         while True:
@@ -74,10 +93,12 @@ def run_game():
             response, send_to_all = run_command(data)
             print(f"{response=}")
             if send_to_all:
-                for s in wss:
+                for i, s in enumerate(wss):
                     if s is not None:
+                        print("send to other client", i)
                         s.send(response)
             else:
+                print("send to requesting client", wsi)
                 ws.send(response)
     except simple_websocket.ConnectionClosed:
         pass

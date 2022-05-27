@@ -167,8 +167,11 @@ class GameState:
             r = self.named_objects["deck_area"].fields["rect"]
             card_obj.set_pos(pygame.Vector2(r.x, r.y))
             card_obj.fields["handle"].draggable = False
+        elif position["area"] == "other_hero_hand":
+            base_pos = other_hero_pos[position["hero_name"]]
+            card_obj.set_pos(base_pos + pygame.Vector2(position["index"] * 60, 0))
 
-    def show_enemy(self, card_obj):
+    def init_enemy(self, card_obj):
         card_obj.set_pos(enemy_pos)
         i = 0
         while i < len(self.object_handles):
@@ -188,6 +191,18 @@ class GameState:
                     symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
                 symbol_obj.fields["model_type"] = "symbol"
                 self.enemy_symbols.append(symbol_obj)
+
+    def init_other_hero(self, hero):
+        for i, card in enumerate(hero.hand):
+            card_obj = self.add_object(
+                pygame.transform.scale(pygame.image.load(
+                    f"{card.name}.jpg"), (50, 75)),
+                draggable=True,
+            )
+            card_obj.fields["position"] = {"area": "other_hero_hand", "hero_name": hero.name, "index": i}
+            card_obj.fields["index"] = card.index
+            card_obj.fields["model_type"] = "hero_card"
+            card_obj.fields["hero_name"] = hero.name
 
     def init_objects(self, game, hero_name):
         enemy_board = self.add_object(pygame.transform.scale(
@@ -211,9 +226,20 @@ class GameState:
             card_obj.fields["model_type"] = "enemy"
             card_obj.fields["symbols"] = card.symbols
             if card.index == enemy_index:
-                self.show_enemy(card_obj)
+                self.init_enemy(card_obj)
+        for other_hero_name, other_hero in [(n, h) for n, h in game.heroes.items() if n != hero_name]:
+            print("other hero", other_hero_name, other_hero)
+            for i, card in enumerate(game.heroes[other_hero_name].hand):
+                card_obj = self.add_object(
+                    pygame.transform.scale(pygame.image.load(
+                        f"{card.name}.jpg"), (50, 75)),
+                    draggable=True,
+                )
+                card_obj.fields["position"] = {"area": "other_hero_hand", "hero_name": other_hero_name, "index": i}
+                card_obj.fields["index"] = card.index
+                card_obj.fields["model_type"] = "hero_card"
+                card_obj.fields["hero_name"] = other_hero_name
 
-        hand_cards = []
         for i, card in enumerate(game.heroes[hero_name].hand):
             card_obj = self.add_object(
                 pygame.transform.scale(pygame.image.load(
@@ -224,7 +250,6 @@ class GameState:
             card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "hero_card"
             card_obj.fields["hero_name"] = hero_name
-            hand_cards.append(card_obj)
 
         for i, card in enumerate(game.heroes[hero_name].discard):
             card_obj = self.add_object(
@@ -287,7 +312,7 @@ class GameState:
         if action["action"] == "flip_enemy":
             card = next(c for c in self.object_handles if c.fields.get(
                 "model_type", None) == "enemy" and c.fields["index"] == action["new_enemy_index"])
-            self.show_enemy(card)
+            self.init_enemy(card)
             play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
             for o in play_stuff:
                 o.fields["position"] = {"area": "discard"}
@@ -316,6 +341,8 @@ class GameState:
                         "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
                     }
             # TODO: else
+        elif action["action"] == "player_join":
+            self.init_other_hero(jsonpickle.decode(action["hero"]))
         elif action["action"] == "win":
             self.won = True
         else:
@@ -414,6 +441,11 @@ if __name__ == "__main__":
         ARROW: pygame.Vector2(750, 450),
         JUMP: pygame.Vector2(750, 500),
     }
+    other_hero_pos = dict(zip([hn for hn in ["Ranger", "Barbarian"] if hn != hero_name], [
+        pygame.Vector2(50, 50),
+        pygame.Vector2((1024 // 2) - 25, 50),
+        pygame.Vector2(1024 - 50 - 50, 50),
+    ]))
 
     screen = pygame.display.set_mode(size)
 
