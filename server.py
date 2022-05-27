@@ -16,6 +16,7 @@ def make_barb():
     hero = game.add_hero("Barbarian")
     hero.hand.append(SymbolCard({SWORD: 1}))
     hero.hand.append(SymbolCard({JUMP: 1}))
+    hero.hand.append(SymbolCard({ARROW: 1}))
     hero.deck = []
     for s in [SWORD, JUMP]:
         for i in range(5):
@@ -26,6 +27,7 @@ def make_ranger():
     hero = game.add_hero("Ranger")
     hero.hand.append(SymbolCard({ARROW: 1}))
     hero.hand.append(SymbolCard({ARROW: 1}))
+    hero.hand.append(SymbolCard({JUMP: 1}))
     hero.deck = []
     for s in [ARROW]:
         for i in range(10):

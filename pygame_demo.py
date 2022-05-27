@@ -209,16 +209,13 @@ class GameState:
                 self.enemy_symbols.append(symbol_obj)
 
     def init_other_hero(self, hero):
-        for i, card in enumerate(hero.hand):
-            card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(
-                    f"{card.name}.jpg"), (50, 75)),
-                draggable=True,
-            )
-            card_obj.fields["position"] = {"area": "other_hero_hand", "hero_name": hero.name, "index": i}
-            card_obj.fields["index"] = card.index
-            card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = hero.name
+        other_pos = other_hero_pos[hero.name]
+        other_deck = self.add_object(font.render(str(len(hero.deck)), True, BLUE), hero.name + "_deck")
+        other_deck.set_pos(other_pos)
+        other_hand = self.add_object(font.render(str(len(hero.hand)), True, BLUE), hero.name + "_hand")
+        other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
+        other_discard = self.add_object(font.render(str(len(hero.discard)), True, BLUE), hero.name + "_discard")
+        other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
 
     def init_objects(self, game, hero_name):
         enemy_board = self.add_object(pygame.transform.scale(
@@ -243,16 +240,13 @@ class GameState:
                 card_obj.set_pos(enemy_pos)
         for other_hero_name, other_hero in [(n, h) for n, h in game.heroes.items() if n != hero_name]:
             print("other hero", other_hero_name, other_hero)
-            for i, card in enumerate(game.heroes[other_hero_name].hand):
-                card_obj = self.add_object(
-                    pygame.transform.scale(pygame.image.load(
-                        f"{card.name}.jpg"), (50, 75)),
-                    draggable=True,
-                )
-                card_obj.fields["position"] = {"area": "other_hero_hand", "hero_name": other_hero_name, "index": i}
-                card_obj.fields["index"] = card.index
-                card_obj.fields["model_type"] = "hero_card"
-                card_obj.fields["hero_name"] = other_hero_name
+            other_pos = other_hero_pos[other_hero_name]
+            other_deck = self.add_object(font.render(str(len(other_hero.deck)), True, BLUE), other_hero_name + "_deck")
+            other_deck.set_pos(other_pos)
+            other_hand = self.add_object(font.render(str(len(other_hero.hand)), True, BLUE), other_hero_name + "_hand")
+            other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
+            other_discard = self.add_object(font.render(str(len(other_hero.discard)), True, BLUE), other_hero_name + "_discard")
+            other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
 
         for i, card in enumerate(game.heroes[hero_name].hand):
             card_obj = self.add_object(
@@ -276,7 +270,7 @@ class GameState:
             card_obj.fields["model_type"] = "hero_card"
             card_obj.fields["hero_name"] = hero_name
             card_obj.fields["visible"] = False
-        player_discard = self.add_object(font.render(str(len(game.heroes[hero_name].discard)), True, BLUE), "player_discard")
+        player_discard = self.add_object(font.render(str(len(game.heroes[hero_name].discard)), True, BLUE), hero_name + "_discard")
         player_discard.set_pos(discard_pos)
 
         for i, card in enumerate(game.heroes[hero_name].deck):
@@ -290,7 +284,7 @@ class GameState:
             card_obj.fields["model_type"] = "hero_card"
             card_obj.fields["hero_name"] = hero_name
             card_obj.fields["visible"] = False
-        player_deck = self.add_object(font.render(str(len(game.heroes[hero_name].deck)), True, BLUE), "player_deck")
+        player_deck = self.add_object(font.render(str(len(game.heroes[hero_name].deck)), True, BLUE), hero_name + "_deck")
         player_deck.set_pos(deck_pos)
 
         for i, (_, card) in enumerate(game.hero_cards_played):
@@ -333,10 +327,14 @@ class GameState:
             card = next(c for c in self.object_handles if c.fields.get(
                 "model_type", None) == "enemy" and c.fields["index"] == action["new_enemy_index"])
             self.init_enemy(card)
-            play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
-            for o in play_stuff:
-                o.fields["position"] = {"area": "discard"}
-                o.fields["visible"] = False
+        elif action["action"] == "update_discard":
+            for hn, indices in action["heroes_to_indices"].items():
+                if hn == hero_name:
+                    for o in [o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["index"] in indices]:
+                        o.fields["position"] = {"area": "discard"}
+                        o.fields["visible"] = False
+                if hn + "_discard" in self.named_objects:
+                    self.named_objects[hn + "_discard"].set_text(str(len(indices)))
         elif action["action"] == "play_card":
             if action["hero_name"] == hero_name:
                 o = next(o for o in self.object_handles if o.fields.get(
@@ -350,19 +348,23 @@ class GameState:
                 hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
                 for i, o in enumerate(hand_stuff):
                     o.fields["position"]["index"] = i
-            # TODO: else
         elif action["action"] == "draw_card":
             if action["hero_name"] == hero_name:
-                o = next(o for o in self.object_handles if o.fields.get(
-                    "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
-                if o.fields.get("position", {"area": None})["area"] != "hand":
-                    hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
-                    o.fields["position"] = {
-                        "area": "hand",
-                        "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
-                    }
-                    o.fields["visible"] = True
-            # TODO: else
+                for entity in action["entities"]:
+                    o = next(o for o in self.object_handles if o.fields.get(
+                        "model_type", None) == "hero_card" and o.fields["index"] == entity)
+                    if o.fields.get("position", {"area": None})["area"] != "hand":
+                        hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
+                        o.fields["position"] = {
+                            "area": "hand",
+                            "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
+                        }
+                        o.fields["visible"] = True
+            else:
+                if (o := self.named_objects.get(action["hero_name"] + "_hand", None)) is not None:
+                    o.set_text(str(action["new_hand_len"]))
+                if (o := self.named_objects.get(action["hero_name"] + "_deck", None)) is not None:
+                    o.set_text(str(action["new_deck_len"]))
         elif action["action"] == "player_join":
             self.init_other_hero(jsonpickle.decode(action["hero"]))
         elif action["action"] == "win":
@@ -402,8 +404,8 @@ class GameState:
             if (p := o.fields.get("position", None)) is not None:
                 self.move_card_to(o, p)
                 counts[p["area"]] += 1
-        self.named_objects["player_discard"].set_text(str(counts["discard"]))
-        self.named_objects["player_deck"].set_text(str(counts["deck"]))
+        self.named_objects[hero_name + "_discard"].set_text(str(counts["discard"]))
+        self.named_objects[hero_name + "_deck"].set_text(str(counts["deck"]))
 
     def step(self):
         step_events = pygame.event.get()

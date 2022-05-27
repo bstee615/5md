@@ -116,6 +116,7 @@ class Game:
                 {"action": "win"})
         for hero_name, card in self.hero_cards_played:
             self.heroes[hero_name].discard.append(card)
+        actions.append({"action": "update_discard", "heroes_to_indices": {hero_name: [c.index for c in hero.discard] for hero_name, hero in self.heroes.items()}})
         self.hero_cards_played = []
         return actions
 
@@ -135,10 +136,12 @@ class Game:
             self.hero_cards_played.append((hero_name, card))
             actions += self.apply_hero_cards()
             status = "success"
+            drawn_card_indices = []
             while len(hero.hand) < 3:
                 draw_card = hero.deck.pop(0)
                 hero.hand.append(draw_card)
-                actions.append({"action": "draw_card", "hero_name": hero_name, "entity": draw_card.index})
+                drawn_card_indices.append(draw_card.index)
+            actions.append({"action": "draw_card", "hero_name": hero_name, "entities": drawn_card_indices, "new_deck_len": len(hero.deck), "new_hand_len": len(hero.hand)})
         else:
             status = "error"
             actions = [{"action": "revert"}]
