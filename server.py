@@ -76,6 +76,7 @@ def run_command(data):
 def run_game():
     ws = simple_websocket.Server(request.environ)
     wsi = len(wss)
+    # TODO: identify clients more intelligently and allow rejoins
     if wsi == 0:
         hero = make_barb()
     if wsi == 1:
@@ -99,6 +100,7 @@ def run_game():
                     if s is not None:
                         print("send to other client", i)
                         s.send(response)
+                # TODO: Handle client disconnect and cleanup
             else:
                 print("send to requesting client", wsi)
                 ws.send(response)

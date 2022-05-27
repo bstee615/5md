@@ -238,6 +238,7 @@ class GameState:
                 self.init_enemy(card_obj)
             else:
                 card_obj.set_pos(enemy_pos)
+
         for other_hero_name, other_hero in [(n, h) for n, h in game.heroes.items() if n != hero_name]:
             print("other hero", other_hero_name, other_hero)
             other_pos = other_hero_pos[other_hero_name]
@@ -247,6 +248,7 @@ class GameState:
             other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
             other_discard = self.add_object(font.render(str(len(other_hero.discard)), True, BLUE), other_hero_name + "_discard")
             other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
+            # TODO: create assets for other players' cards and show them in play area
 
         for i, card in enumerate(game.heroes[hero_name].hand):
             card_obj = self.add_object(
@@ -492,6 +494,8 @@ if __name__ == "__main__":
         p.start()
 
     state = GameState()
+    # TODO: Handle connection errors
+    # TODO: limit frame rate
     while 1:
         try:
             state.step()
