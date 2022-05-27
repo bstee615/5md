@@ -104,7 +104,7 @@ class Handle:
 
 
 class MyObject:
-    def __init__(self, obj, rect=True, draggable=False):
+    def __init__(self, obj, rect=True, draggable=False, visible=True):
         self.fields = {}
         self.fields["object"] = obj
         if rect:
@@ -116,6 +116,7 @@ class MyObject:
                 raise NotImplementedError(type(obj))
         if draggable:
             self.fields["handle"] = Handle()
+        self.fields["visible"] = visible
         self.children = []
 
     def set_pos(self, p, touched=None):
@@ -270,6 +271,7 @@ class GameState:
             card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "hero_card"
             card_obj.fields["hero_name"] = hero_name
+            card_obj.fields["visible"] = False
 
         for i, card in enumerate(game.heroes[hero_name].deck):
             card_obj = self.add_object(
@@ -281,6 +283,7 @@ class GameState:
             card_obj.fields["index"] = card.index
             card_obj.fields["model_type"] = "hero_card"
             card_obj.fields["hero_name"] = hero_name
+            card_obj.fields["visible"] = False
 
         for i, (_, card) in enumerate(game.hero_cards_played):
             print("play area", card)
@@ -325,6 +328,7 @@ class GameState:
             play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
             for o in play_stuff:
                 o.fields["position"] = {"area": "discard"}
+                o.fields["visible"] = False
         elif action["action"] == "play_card":
             if action["hero_name"] == hero_name:
                 o = next(o for o in self.object_handles if o.fields.get(
@@ -349,6 +353,7 @@ class GameState:
                         "area": "hand",
                         "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
                     }
+                    o.fields["visible"] = True
             # TODO: else
         elif action["action"] == "player_join":
             self.init_other_hero(jsonpickle.decode(action["hero"]))
@@ -428,6 +433,8 @@ class GameState:
 
         screen.blit(background, (0, 0))
         for o in self.object_handles:
+            if not o.fields["visible"]:
+                continue
             if isinstance(o.fields["object"], pygame.Surface):
                 screen.blit(o.fields["object"], o.fields["rect"])
             elif isinstance(o.fields["object"], pygame.Rect):
