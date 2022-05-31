@@ -1,12 +1,13 @@
 from collections import defaultdict
 import json
 import random
+import time
 import jsonpickle
 import sys
 import traceback
 import pygame
 import simple_websocket
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Value
 import sys
 
 from model import ARROW, JUMP, SWORD, Game, SymbolCard
@@ -18,8 +19,29 @@ if len(sys.argv) > 2:
     networking = sys.argv[2] != "no"
 else:
     networking = True
+    should_close = Value('i', 0)
+    should_init = Value('i', 0)
 
-def worker(recv_q, send_q):
+def try_connect():
+    max_retry_strikes = 3
+    retry_strikes = 0
+    did_connect = False
+    while retry_strikes < max_retry_strikes and should_close.value != 1:
+        try:
+            ws = simple_websocket.Client('ws://localhost:5000/game')
+            did_connect = True
+            break
+        except (simple_websocket.ConnectionError, ConnectionRefusedError) as e:
+            retry_strikes += 1
+            print("error connecting to server:", retry_strikes, "strikes", e)
+            time.sleep(1)
+    if did_connect:
+        ws.send(json.dumps({"command": "login", "hero_name": hero_name}))
+        return ws
+    else:
+        raise Exception("Error connecting to goodies")
+
+def worker(recv_q, send_q, should_close, should_init):
     """
     Worker process for corralling input/output messages.
     recv_q is a queue of output messages received from the server.
@@ -29,26 +51,35 @@ def worker(recv_q, send_q):
     then dequeue and send all required messages.
     This process should be joined at close to ensure that cleanup happens.
     """
-    ws = simple_websocket.Client('ws://localhost:5000/game')
-    while True:
-        try:
-            data = ws.receive(0)
-        except simple_websocket.ws.ConnectionClosed:
-            break
-        if data:
-            print(f"{data=}")
-            recv_q.put(data)
-        while not send_q.empty():
-            cmd = send_q.get()
-            if cmd == "close":
-                ws.close()
-                break
-            ws.send(cmd)
-    ws.close()
+    try:
+        ws = try_connect()
+        should_init.value = 1
+        while True:
+            try:
+                if should_close.value == 1:
+                    break
+                data = ws.receive(0)
+                if data:
+                    print(f"{data=}")
+                    recv_q.put(data)
+                while not send_q.empty():
+                    cmd = send_q.get()
+                    ws.send(cmd)
+            except simple_websocket.ConnectionClosed:
+                ws = try_connect()
+        ws.close()
+    except Exception:
+        print("error in websocket thread")
+        traceback.print_exc()
+        should_close.value = 1
+        pygame.quit()
+        sys.exit()
 
 
 def wait_for_data():
     while recv_q.empty():
+        if should_close.value == 1:
+            raise Exception("closed before data arrived in ingoing queue")
         pass
     return recv_q.get()
 
@@ -61,8 +92,9 @@ def send_ws_command(cmd, wait_for_response=True):
 
 def close_network():
     if networking:
-        send_ws_command("close", wait_for_response=False)
-        p.join()
+        should_close.value = 1
+        if p is not None:
+            p.join()
 
 
 def initialize_from_network():
@@ -414,6 +446,7 @@ class GameState:
         for event in step_events:
             if event.type == pygame.QUIT:
                 close_network()
+                pygame.quit()
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 left, middle, right = pygame.mouse.get_pressed()
@@ -459,6 +492,19 @@ class GameState:
 
 
 if __name__ == "__main__":
+    # Turn-on the worker thread.
+    if networking:
+        print("initialize websocket thread")
+        recv_q = Queue()
+        send_q = Queue()
+
+        p = Process(target=worker, args=(recv_q, send_q, should_close, should_init))
+        p.start()
+    
+    while should_init.value != 1:
+        if should_close.value == 1:
+            raise Exception("closed before window initialized")
+
     pygame.init()
 
     size = width, height = 1024, 768
@@ -485,21 +531,15 @@ if __name__ == "__main__":
 
     screen = pygame.display.set_mode(size)
 
-    # Turn-on the worker thread.
-    if networking:
-        recv_q = Queue()
-        send_q = Queue()
-
-        p = Process(target=worker, args=(recv_q, send_q))
-        p.start()
-
-    state = GameState()
-    # TODO: Handle connection errors
-    # TODO: limit frame rate
-    while 1:
-        try:
+    try:
+        print("initialize game")
+        state = GameState()
+        # TODO: limit frame rate
+        while should_close.value != 1:
             state.step()
-        except Exception:
-            traceback.print_exc()
-            close_network()
-            exit(1)
+    except Exception:
+        print("error in UI thread")
+        traceback.print_exc()
+        close_network()
+        pygame.quit()
+        sys.exit()

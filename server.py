@@ -12,27 +12,26 @@ game.init_boss("Baby Barbarian")
 game.add_enemy("Slime", {SWORD: 2})
 game.add_enemy("Skeleton", {ARROW: 1})
 
-def make_barb():
-    hero = game.add_hero("Barbarian")
-    hero.hand.append(SymbolCard({SWORD: 1}))
-    hero.hand.append(SymbolCard({JUMP: 1}))
-    hero.hand.append(SymbolCard({ARROW: 1}))
-    hero.deck = []
-    for s in [SWORD, JUMP]:
-        for i in range(5):
-            hero.deck.append(SymbolCard({s: 1}))
-    random.shuffle(hero.deck)
-    return hero
-def make_ranger():
-    hero = game.add_hero("Ranger")
-    hero.hand.append(SymbolCard({ARROW: 1}))
-    hero.hand.append(SymbolCard({ARROW: 1}))
-    hero.hand.append(SymbolCard({JUMP: 1}))
-    hero.deck = []
-    for s in [ARROW]:
-        for i in range(10):
-            hero.deck.append(SymbolCard({s: 1}))
-    random.shuffle(hero.deck)
+def make_hero(hero_name):
+    hero = game.add_hero(hero_name)
+    if hero_name == "Barbarian":
+        hero.hand.append(SymbolCard({SWORD: 1}))
+        hero.hand.append(SymbolCard({JUMP: 1}))
+        hero.hand.append(SymbolCard({ARROW: 1}))
+        hero.deck = []
+        for s in [SWORD, JUMP]:
+            for i in range(5):
+                hero.deck.append(SymbolCard({s: 1}))
+        random.shuffle(hero.deck)
+    if hero_name == "Ranger":
+        hero.hand.append(SymbolCard({ARROW: 1}))
+        hero.hand.append(SymbolCard({ARROW: 1}))
+        hero.hand.append(SymbolCard({JUMP: 1}))
+        hero.deck = []
+        for s in [ARROW]:
+            for i in range(10):
+                hero.deck.append(SymbolCard({s: 1}))
+        random.shuffle(hero.deck)
     return hero
 
 print(game)
@@ -76,11 +75,11 @@ def run_command(data):
 def run_game():
     ws = simple_websocket.Server(request.environ)
     wsi = len(wss)
-    # TODO: identify clients more intelligently and allow rejoins
-    if wsi == 0:
-        hero = make_barb()
-    if wsi == 1:
-        hero = make_ranger()
+    data = ws.receive()
+    command = json.loads(data)
+    assert command["command"] == "login", f"invalid command {command}"
+    hero_name = command["hero_name"]
+    hero = game.heroes.get(hero_name, make_hero(hero_name))
     for i, s in enumerate(wss):
         if s is not None:
             try:
