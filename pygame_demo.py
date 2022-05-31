@@ -191,6 +191,7 @@ class GameState:
         self.named_objects = {}
         self.enemy_symbols = []
         self.won = False
+        self.clock = pygame.time.Clock()
 
         game = initialize_from_network()
         self.init_objects(game, hero_name)
@@ -442,6 +443,7 @@ class GameState:
         self.named_objects[hero_name + "_deck"].set_text(str(counts["deck"]))
 
     def step(self):
+        dt = self.clock.tick(framerate)
         step_events = pygame.event.get()
         for event in step_events:
             if event.type == pygame.QUIT:
@@ -514,6 +516,7 @@ if __name__ == "__main__":
     RED = (255, 0, 0)
     GREEN = (0, 255, 0)
     BLUE = (0, 0, 255)
+    framerate = 60
 
     enemy_pos = pygame.Vector2(750, 200)
     discard_pos = pygame.Vector2(900, 600)
@@ -534,7 +537,6 @@ if __name__ == "__main__":
     try:
         print("initialize game")
         state = GameState()
-        # TODO: limit frame rate
         while should_close.value != 1:
             state.step()
     except Exception:
