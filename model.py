@@ -49,22 +49,24 @@ def Hero(name):
 
 
 class EchoEmitSystem(System):
-    def __init__(self):
+    def __init__(self, name):
         super().__init__(prioritize=True)
         self.subscribe("remote_event")
+        self.name = name
 
     def update(self):
         events = self.pending()
         for ev in events:
-            print("remote event", ev)
-            ev_ev = ev["event"]
-            ev_ev["remote"] = True
-            self.inject(ev_ev)
+            if ev["sender"] != self.name:
+                print("remote event", ev)
+                ev_ev = ev["event"]
+                ev_ev["remote"] = True
+                self.inject(ev_ev)
 
 
 class EmitSystem(System):
     def __init__(self, send_fn, name):
-        super().__init__(prioritize=True)
+        super().__init__()
         self.subscribe("add_hero")
         self.subscribe("flip_enemy")
         self.subscribe("play_card")

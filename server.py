@@ -33,13 +33,13 @@ hcps.play_area.append(SymbolCard({ARROW: 1}).id)
 eds = EnemyDeckSystem(
     [
         EnemyCard("Slime", {SWORD: 2}),
-        EnemyCard("Bear", {ARROW: 1}),
+        # EnemyCard("Bear", {ARROW: 1}),
         EnemyCard("Skeleton", {JUMP: 1}),
     ],
     BossCard("Baby Barbarian", {SWORD: 2, ARROW: 2, JUMP: 3}),
     hcps,
 )
-ees = EchoEmitSystem()
+ees = EchoEmitSystem("server")
 
 """
 List of websockets.
@@ -84,7 +84,7 @@ def run_game():
     ws.send(
         json.dumps(
             {
-                "message": "init",
+                "type": "init",
                 "game": jsonpickle.encode(
                     {
                         "HeroCardPositionSystem": hcps,

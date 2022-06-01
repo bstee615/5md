@@ -177,10 +177,10 @@ class HeroCardGraphicSystem(System):
             if ev["type"] == "flip_enemy":
                 old_rect = self.player_deck.graphic.rect
                 self.player_deck.graphic.asset = font.render(str(len(self.hcps.discard[self.my_hero_id])), True, BLUE)
-                self.player_deck.graphic.rect = self.player_deck.graphic.get_rect()
+                self.player_deck.graphic.rect = self.player_deck.graphic.asset.get_rect()
                 self.player_deck.graphic.rect.move_ip(pygame.Vector2(old_rect.x, old_rect.y))
-                for o in self.play_area:
-                    o.graphic.visible = False
+                for o in self.hcps.play_area:
+                    Entity.get(o).graphic.visible = False
             elif ev["type"] == "play_card":
                 card = Entity.get(ev["card"])
                 card.graphic.visible = True
@@ -274,8 +274,21 @@ class InputSystem(System):
                 for h in grabbed:
                     h.graphic.grabbed = False
                     if play_rect.colliderect(h.graphic.rect):
-                        System.inject({"type": "play_card", "card": h.id})
+                        send_ws_command({"type": "remote_event", "sender": "client", "event": {"type": "play_card", "card": h.id}}, wait_for_response=False)
+                        # functools.partial(send_ws_command, wait_for_response=False)
+                        # System.inject({"type": "remote_event", "name": "client", "event": {"type": "play_card", "card": h.id}})
 
+class GetFromQueueSystem(System):
+    def __init__(self):
+        super().__init__(prioritize=True)
+    
+    def update(self):
+        while not recv_q.empty():
+            ev = json.loads(recv_q.get())
+            if ev["type"] == "init":
+                continue
+            print("event", ev)
+            self.inject(ev)
 
 """ECS"""
 
@@ -288,14 +301,16 @@ class Game:
 
         data = wait_for_data()
         message = json.loads(data)
+        assert message["type"] == "init"
         game = jsonpickle.decode(message["game"])
         self.hcps = game["HeroCardPositionSystem"]
         self.eds = game["EnemyDeckSystem"]
         Entity.reset(**game["Entity"])
+        self.gqs = GetFromQueueSystem()
 
         self.ins = InputSystem()
-        self.es = EmitSystem(functools.partial(send_ws_command, wait_for_response=False), "server")
-        self.ees = EchoEmitSystem()
+        # self.es = EmitSystem(functools.partial(send_ws_command, wait_for_response=False), "server")
+        self.ees = EchoEmitSystem("client")
         # System.reset(**game["System"])
         # print("subscriptions", System.subscriptions)
 
