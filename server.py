@@ -123,6 +123,7 @@ def run_game():
             #     ws.send(response)
             System.update_all()
     except simple_websocket.ConnectionClosed:
+        # TODO: handle rejoin
         pass
     wsi[wsi] = None
     return ""

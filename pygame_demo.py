@@ -186,12 +186,15 @@ class HeroCardGraphicSystem(System):
     def update(self):
         events = self.pending()
         for ev in events:
+            # TODO: add multiple players
+            # TODO: compare with previous version of state to determine movements
             if ev["type"] == "flip_enemy":
                 print("flip_enemy")
                 self.update_deck()
                 self.update_discard()
                 for o in self.hcps.play_area:
                     Entity.get(o).graphic.visible = False
+                # TODO: display new enemy and symbols
             elif ev["type"] == "play_card":
                 card = Entity.get(ev["card"])
                 card.graphic.visible = True
@@ -287,8 +290,7 @@ class InputSystem(System):
                     h.graphic.grabbed = False
                     if play_rect.colliderect(h.graphic.rect):
                         send_ws_command({"type": "remote_event", "sender": "client", "event": {"type": "play_card", "card": h.id}}, wait_for_response=False)
-                        # functools.partial(send_ws_command, wait_for_response=False)
-                        # System.inject({"type": "remote_event", "name": "client", "event": {"type": "play_card", "card": h.id}})
+                    # TODO: else drop back into hand
 
 class GetFromQueueSystem(System):
     def __init__(self):
@@ -297,6 +299,7 @@ class GetFromQueueSystem(System):
     def update(self):
         while not recv_q.empty():
             ev = json.loads(recv_q.get())
+            # TODO: handle rejoin
             if ev["type"] == "init":
                 continue
             print("event", ev)
