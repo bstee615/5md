@@ -128,6 +128,23 @@ def initialize_from_network():
 """NETWORKING"""
 
 
+# class ResourceManager:
+#     def __init__(self):
+#         self.resources = {}
+    
+#     def load_text(self, text, name=None, color=None):
+#         if name is None:
+#             name = f"text_{text}"
+#         if color is None:
+#             color = BLUE
+#         self.resources[name] = font.render(text, True, color)
+    
+#     def load_image(self, filepath, name=None):
+#         if name is None:
+#             name = filepath
+#         self.resources[name] = pygame.image.load(filepath)
+
+
 class Handle:
     """Grabbable handle on object"""
 
@@ -241,14 +258,28 @@ class GameState:
                 symbol_obj.fields["model_type"] = "symbol"
                 self.enemy_symbols.append(symbol_obj)
 
-    def init_other_hero(self, hero):
-        other_pos = other_hero_pos[hero.name]
-        other_deck = self.add_object(font.render(str(len(hero.deck)), True, BLUE), hero.name + "_deck")
+    def create_card(self, hero_name, card, position, visible=True):
+        card_obj = self.add_object(
+            pygame.transform.scale(pygame.image.load(
+                f"{card.name}.jpg"), (100, 150)),
+            draggable=True,
+        )
+        card_obj.fields["position"] = position
+        card_obj.fields["index"] = card.index
+        card_obj.fields["model_type"] = "hero_card"
+        card_obj.fields["hero_name"] = hero_name
+        card_obj.fields["visible"] = visible
+
+    def init_other_hero(self, other_hero):
+        other_pos = other_hero_pos[other_hero.name]
+        other_deck = self.add_object(font.render(str(len(other_hero.deck)), True, BLUE), other_hero.name + "_deck")
         other_deck.set_pos(other_pos)
-        other_hand = self.add_object(font.render(str(len(hero.hand)), True, BLUE), hero.name + "_hand")
+        other_hand = self.add_object(font.render(str(len(other_hero.hand)), True, BLUE), other_hero.name + "_hand")
         other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
-        other_discard = self.add_object(font.render(str(len(hero.discard)), True, BLUE), hero.name + "_discard")
+        other_discard = self.add_object(font.render(str(len(other_hero.discard)), True, BLUE), other_hero.name + "_discard")
         other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
+        for card in other_hero.hand + other_hero.deck + other_hero.discard:
+            self.create_card(other_hero.name, card, {"area": "other_player"}, False)
 
     def init_objects(self, game, hero_name):
         enemy_board = self.add_object(pygame.transform.scale(
@@ -272,67 +303,23 @@ class GameState:
             else:
                 card_obj.set_pos(enemy_pos)
 
-        for other_hero_name, other_hero in [(n, h) for n, h in game.heroes.items() if n != hero_name]:
-            print("other hero", other_hero_name, other_hero)
-            other_pos = other_hero_pos[other_hero_name]
-            other_deck = self.add_object(font.render(str(len(other_hero.deck)), True, BLUE), other_hero_name + "_deck")
-            other_deck.set_pos(other_pos)
-            other_hand = self.add_object(font.render(str(len(other_hero.hand)), True, BLUE), other_hero_name + "_hand")
-            other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
-            other_discard = self.add_object(font.render(str(len(other_hero.discard)), True, BLUE), other_hero_name + "_discard")
-            other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
-            # TODO: create assets for other players' cards and show them in play area
+        for other_hero in [h for n, h in game.heroes.items() if n != hero_name]:
+            self.init_other_hero(other_hero)
 
         for i, card in enumerate(game.heroes[hero_name].hand):
-            card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(
-                    f"{card.name}.jpg"), (100, 150)),
-                draggable=True,
-            )
-            card_obj.fields["position"] = {"area": "hand", "index": i}
-            card_obj.fields["index"] = card.index
-            card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = hero_name
+            self.create_card(hero_name, card, {"area": "hand", "index": i})
 
         for i, card in enumerate(game.heroes[hero_name].discard):
-            card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(
-                    f"{card.name}.jpg"), (100, 150)),
-                draggable=True,
-            )
-            card_obj.fields["position"] = {"area": "discard"}
-            card_obj.fields["index"] = card.index
-            card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = hero_name
-            card_obj.fields["visible"] = False
+            card_obj = self.create_card(hero_name, card, {"area": "discard"}, False)
+        for i, card in enumerate(game.heroes[hero_name].deck):
+            card_obj = self.create_card(hero_name, card, {"area": "deck"}, False)
         player_discard = self.add_object(font.render(str(len(game.heroes[hero_name].discard)), True, BLUE), hero_name + "_discard")
         player_discard.set_pos(discard_pos)
-
-        for i, card in enumerate(game.heroes[hero_name].deck):
-            card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(
-                    f"{card.name}.jpg"), (100, 150)),
-                draggable=True,
-            )
-            card_obj.fields["position"] = {"area": "deck"}
-            card_obj.fields["index"] = card.index
-            card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = hero_name
-            card_obj.fields["visible"] = False
         player_deck = self.add_object(font.render(str(len(game.heroes[hero_name].deck)), True, BLUE), hero_name + "_deck")
         player_deck.set_pos(deck_pos)
 
         for i, (_, card) in enumerate(game.hero_cards_played):
-            print("play area", card)
-            card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(
-                    f"{card.name}.jpg"), (100, 150)),
-                draggable=True
-            )
-            card_obj.fields["position"] = {"area": "play_area", "index": i}
-            card_obj.fields["index"] = card.index
-            card_obj.fields["model_type"] = "hero_card"
-            card_obj.fields["hero_name"] = hero_name
+            card_obj = self.create_card(hero_name, card, {"area": "play_area", "index": i})
             
         self.update_card_pos()
 
@@ -364,25 +351,27 @@ class GameState:
             self.init_enemy(card)
         elif action["action"] == "update_discard":
             for hn, indices in action["heroes_to_indices"].items():
-                if hn == hero_name:
-                    for o in [o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["index"] in indices]:
+                for o in [o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["index"] in indices]:
+                    if hn == hero_name:
                         o.fields["position"] = {"area": "discard"}
-                        o.fields["visible"] = False
+                    else:
+                        o.fields["position"] = {"area": "other_hero"}
+                    o.fields["visible"] = False
                 if hn + "_discard" in self.named_objects:
                     self.named_objects[hn + "_discard"].set_text(str(len(indices)))
         elif action["action"] == "play_card":
-            if action["hero_name"] == hero_name:
-                o = next(o for o in self.object_handles if o.fields.get(
-                    "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
-                play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
-                o.fields["position"] = {
-                    "area": "play_area",
-                    "index": max(o.fields["position"]["index"] for o in play_stuff) + 1 if len(play_stuff) > 0 else 0,
-                }
-                hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
-                hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
-                for i, o in enumerate(hand_stuff):
-                    o.fields["position"]["index"] = i
+            o = next(o for o in self.object_handles if o.fields.get(
+                "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
+            play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
+            o.fields["position"] = {
+                "area": "play_area",
+                "index": max(o.fields["position"]["index"] for o in play_stuff) + 1 if len(play_stuff) > 0 else 0,
+            }
+            o.fields["visible"] = True
+            hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
+            hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
+            for i, o in enumerate(hand_stuff):
+                o.fields["position"]["index"] = i
         elif action["action"] == "draw_card":
             if action["hero_name"] == hero_name:
                 for entity in action["entities"]:
@@ -494,47 +483,47 @@ class GameState:
 
 
 if __name__ == "__main__":
-    # Turn-on the worker thread.
-    if networking:
-        print("initialize websocket thread")
-        recv_q = Queue()
-        send_q = Queue()
-
-        p = Process(target=worker, args=(recv_q, send_q, should_close, should_init))
-        p.start()
-    
-    while should_init.value != 1:
-        if should_close.value == 1:
-            raise Exception("closed before window initialized")
-
-    pygame.init()
-
-    size = width, height = 1024, 768
-    background = pygame.image.load("bg.png")
-    win = pygame.image.load("win.png")
-    font = pygame.font.SysFont(None, 24)
-    RED = (255, 0, 0)
-    GREEN = (0, 255, 0)
-    BLUE = (0, 0, 255)
-    framerate = 60
-
-    enemy_pos = pygame.Vector2(750, 200)
-    discard_pos = pygame.Vector2(900, 600)
-    deck_pos = pygame.Vector2(100, 600)
-    symbol_pos = {
-        SWORD: pygame.Vector2(750, 400),
-        ARROW: pygame.Vector2(750, 450),
-        JUMP: pygame.Vector2(750, 500),
-    }
-    other_hero_pos = dict(zip([hn for hn in ["Ranger", "Barbarian"] if hn != hero_name], [
-        pygame.Vector2(50, 50),
-        pygame.Vector2((1024 // 2) - 25, 50),
-        pygame.Vector2(1024 - 50 - 50, 50),
-    ]))
-
-    screen = pygame.display.set_mode(size)
-
     try:
+        # Turn-on the worker thread.
+        if networking:
+            print("initialize websocket thread")
+            recv_q = Queue()
+            send_q = Queue()
+
+            p = Process(target=worker, args=(recv_q, send_q, should_close, should_init))
+            p.start()
+    
+        while should_init.value != 1:
+            if should_close.value == 1:
+                raise Exception("closed before window initialized")
+
+        pygame.init()
+
+        size = width, height = 1024, 768
+        background = pygame.image.load("bg.png")
+        win = pygame.image.load("win.png")
+        font = pygame.font.SysFont(None, 24)
+        RED = (255, 0, 0)
+        GREEN = (0, 255, 0)
+        BLUE = (0, 0, 255)
+        framerate = 60
+
+        enemy_pos = pygame.Vector2(750, 200)
+        discard_pos = pygame.Vector2(900, 600)
+        deck_pos = pygame.Vector2(100, 600)
+        symbol_pos = {
+            SWORD: pygame.Vector2(750, 400),
+            ARROW: pygame.Vector2(750, 450),
+            JUMP: pygame.Vector2(750, 500),
+        }
+        other_hero_pos = dict(zip([hn for hn in ["Ranger", "Barbarian"] if hn != hero_name], [
+            pygame.Vector2(50, 50),
+            pygame.Vector2((1024 // 2) - 25, 50),
+            pygame.Vector2(1024 - 50 - 50, 50),
+        ]))
+
+        screen = pygame.display.set_mode(size)
+
         print("initialize game")
         state = GameState()
         while should_close.value != 1:
