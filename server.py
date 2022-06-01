@@ -5,7 +5,9 @@ import simple_websocket
 import random
 
 from model import *
+
 app = Flask(__name__)
+
 
 def make_hero(hero_name):
     hero = Hero(hero_name)
@@ -24,6 +26,7 @@ def make_hero(hero_name):
         "hand": [SymbolCard({SWORD: 1}), SymbolCard({JUMP: 1}), SymbolCard({ARROW: 1})],
         "discard": [],
     }
+
 
 hcps = HeroCardPositionSystem([make_hero("Ranger"), make_hero("Barbarian")])
 hcps.play_area.append(SymbolCard({ARROW: 1}).id)
@@ -58,7 +61,7 @@ def run_command(message):
     return ret, send_to_all
 
 
-@app.route('/game', websocket=True)
+@app.route("/game", websocket=True)
 def run_game():
     ws = simple_websocket.Server(request.environ)
     wsi = len(wss)
@@ -69,24 +72,36 @@ def run_game():
     for i, s in enumerate(wss):
         if s is not None:
             try:
-                s.send(json.dumps({
-                    "actions": [{
-                        "action": "player_join",
-                        "hero": hero_name,
-                    }],
-                }))
+                s.send(
+                    json.dumps(
+                        {
+                            "actions": [
+                                {
+                                    "action": "player_join",
+                                    "hero": hero_name,
+                                }
+                            ],
+                        }
+                    )
+                )
             except ConnectionResetError:
                 print("client", i, "disconnected")
                 wss[i] = None
-    ws.send(json.dumps({
-        "message": "init",
-        "game": jsonpickle.encode({
-            "HeroCardPositionSystem": hcps,
-            "EnemyDeckSystem": eds,
-            "Entity": Entity.serialize(),
-            "System": System.serialize(),
-        }),
-    }))
+    ws.send(
+        json.dumps(
+            {
+                "message": "init",
+                "game": jsonpickle.encode(
+                    {
+                        "HeroCardPositionSystem": hcps,
+                        "EnemyDeckSystem": eds,
+                        "Entity": Entity.serialize(),
+                        "System": System.serialize(),
+                    }
+                ),
+            }
+        )
+    )
     wss.append(ws)
     try:
         while True:
@@ -109,8 +124,8 @@ def run_game():
     except simple_websocket.ConnectionClosed:
         pass
     wsi[wsi] = None
-    return ''
+    return ""
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run()

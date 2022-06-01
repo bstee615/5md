@@ -1,6 +1,4 @@
-from collections import defaultdict
 import json
-import random
 import time
 import jsonpickle
 import sys
@@ -19,8 +17,9 @@ if len(sys.argv) > 2:
     networking = sys.argv[2] != "no"
 else:
     networking = True
-    should_close = Value('i', 0)
-    should_init = Value('i', 0)
+    should_close = Value("i", 0)
+    should_init = Value("i", 0)
+
 
 def try_connect():
     max_retry_strikes = 3
@@ -28,7 +27,7 @@ def try_connect():
     did_connect = False
     while retry_strikes < max_retry_strikes and should_close.value != 1:
         try:
-            ws = simple_websocket.Client('ws://localhost:5000/game')
+            ws = simple_websocket.Client("ws://localhost:5000/game")
             did_connect = True
             break
         except (simple_websocket.ConnectionError, ConnectionRefusedError) as e:
@@ -40,6 +39,7 @@ def try_connect():
         return ws
     else:
         raise Exception("Error connecting to goodies")
+
 
 def worker(recv_q, send_q, should_close, should_init):
     """
@@ -83,12 +83,14 @@ def wait_for_data():
         pass
     return recv_q.get()
 
+
 def send_ws_command(cmd, wait_for_response=True):
     print("send_ws_command", cmd)
     if networking:
         send_q.put(cmd)
         if wait_for_response:
             return wait_for_data()
+
 
 def close_network():
     if networking:
@@ -97,88 +99,11 @@ def close_network():
             p.join()
 
 
-# def initialize_from_network():
-#     if networking:
-#         # print("data =", repr(data))
-#         response = json.loads(data)
-#         # print("response =", response)
-#         return jsonpickle.decode(response["game"])
-#     else:
-#         pass
-
-
 """NETWORKING"""
 
 
-# class ResourceManager:
-#     def __init__(self):
-#         self.resources = {}
-    
-#     def load_text(self, text, name=None, color=None):
-#         if name is None:
-#             name = f"text_{text}"
-#         if color is None:
-#             color = BLUE
-#         self.resources[name] = font.render(text, True, color)
-    
-#     def load_image(self, filepath, name=None):
-#         if name is None:
-#             name = filepath
-#         self.resources[name] = pygame.image.load(filepath)
+"""ECS"""
 
-
-class Handle:
-    """Grabbable handle on object"""
-
-    def __init__(self):
-        self.draggable = True
-        self.grabbed = False
-        self.grab_offset = pygame.Vector2()
-
-
-class MyObject:
-    def __init__(self, obj, rect=True, draggable=False, visible=True):
-        self.fields = {}
-        self.fields["object"] = obj
-        if rect:
-            if isinstance(obj, pygame.Surface):
-                self.fields["rect"] = obj.get_rect()
-            elif isinstance(obj, pygame.Rect):
-                self.fields["rect"] = obj
-            else:
-                raise NotImplementedError(type(obj))
-        if draggable:
-            self.fields["handle"] = Handle()
-        self.fields["visible"] = visible
-        self.children = []
-
-    def set_pos(self, p, touched=None):
-        if touched is None:
-            touched = set()
-        self.fields["rect"].x = p.x
-        self.fields["rect"].y = p.y
-        for ch, off in self.children:
-            if ch not in touched:
-                ch.set_pos(p + off, touched.union({self}))
-        if "parent" in self.fields:
-            p, p_off = self.fields["parent"]
-            p.set_pos(pygame.Vector2(
-                self.fields["rect"].x, self.fields["rect"].y) - p_off, touched.union({self}))
-
-    def add_child(self, obj, offset):
-        obj.set_pos(pygame.Vector2(
-            self.fields["rect"].x, self.fields["rect"].y) + offset)
-        self.children.append((obj, offset))
-        obj.fields["parent"] = (self, offset)
-    
-    def set_text(self, text):
-        r = self.fields["rect"]
-        self.fields["object"] = t = font.render(text, True, BLUE)
-        self.fields["rect"] = t.get_rect()
-        self.set_pos(pygame.Vector2(r.x, r.y))
-
-    def __repr__(self):
-        return f"{self.fields}"
 
 class HeroCardGraphicSystem(System):
     def __init__(self, hcps):
@@ -191,10 +116,13 @@ class HeroCardGraphicSystem(System):
 
         for card in Entity.filter("hero_card"):
             card.attach(Component("graphic"))
-            card.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbols_to_name(card.symbol_count.symbols)}.jpg"), (100, 150))
+            card.graphic.asset = pygame.transform.scale(
+                pygame.image.load(f"{symbols_to_name(card.symbol_count.symbols)}.jpg"),
+                (100, 150),
+            )
             card.graphic.rect = card.graphic.asset.get_rect()
             card.graphic.visible = False
-            
+
         for i, card_id in enumerate(hcps.play_area):
             card = Entity.get(card_id)
             card_offset = 125
@@ -213,37 +141,47 @@ class HeroCardGraphicSystem(System):
                 card = Entity.get(card_id)
                 space_between_cards = 125
                 num_cards_in_hand = len(hcps.hand[hero_id])
-                x = ((1024 // 2) - 50 - ((space_between_cards * num_cards_in_hand) // 2) + (space_between_cards * i))
+                x = (
+                    (1024 // 2)
+                    - 50
+                    - ((space_between_cards * num_cards_in_hand) // 2)
+                    + (space_between_cards * i)
+                )
                 y = 600
                 card.graphic.rect.x = x
                 card.graphic.rect.y = y
                 card.graphic.visible = True
             player_discard = Entity()
             player_discard.attach(Component("graphic"))
-            player_discard.graphic.asset = font.render(str(len(hcps.discard[hero_id])), True, BLUE)
+            player_discard.graphic.asset = font.render(
+                str(len(hcps.discard[hero_id])), True, BLUE
+            )
             player_discard.graphic.rect = card.graphic.asset.get_rect()
             player_discard.graphic.rect.x = deck_pos.x
             player_discard.graphic.rect.y = deck_pos.y
             player_deck = Entity()
             player_deck.attach(Component("graphic"))
-            player_deck.graphic.asset = font.render(str(len(hcps.deck[hero_id])), True, BLUE)
+            player_deck.graphic.asset = font.render(
+                str(len(hcps.deck[hero_id])), True, BLUE
+            )
             player_deck.graphic.rect = card.graphic.asset.get_rect()
             player_deck.graphic.rect.x = deck_pos.x
             player_deck.graphic.rect.y = deck_pos.y
 
-    
     def update(self):
         events = self.pending()
         for ev in events:
             # if ev["type"] == "draw_cards":
             pass
-        
+
         mouse_pos = get_mouse_pos()
-        graphic_handles = [gh for gh in set(Entity.filter("graphic")) if gh.graphic.grabbed]
+        graphic_handles = [
+            gh for gh in set(Entity.filter("graphic")) if gh.graphic.grabbed
+        ]
         for gh in graphic_handles:
             new_pos = mouse_pos - gh.graphic.grab_offset
             gh.graphic.rect.x, gh.graphic.rect.y = new_pos
-        
+
         if self.won:
             screen.blit(win, (0, 0))
         else:
@@ -257,16 +195,17 @@ class HeroCardGraphicSystem(System):
 def get_mouse_pos():
     return pygame.Vector2(pygame.mouse.get_pos())
 
+
 class InputSystem(System):
     def __init__(self):
         super().__init__()
         self.left_down = False
-    
+
     def update(self):
         events = self.pending()
         for ev in events:
             pass
-        
+
         step_events = pygame.event.get()
         left, middle, right = pygame.mouse.get_pressed()
         for event in step_events:
@@ -279,11 +218,15 @@ class InputSystem(System):
                 self.left_down = left
                 if left:
                     mouse_pos = get_mouse_pos()
-                    handleable = set(Entity.filter("hero_card")) & set(Entity.filter("graphic"))
+                    handleable = set(Entity.filter("hero_card")) & set(
+                        Entity.filter("graphic")
+                    )
                     for h in handleable:
                         hr = h.graphic.rect
                         if hr.collidepoint(mouse_pos):
-                            h.graphic.grab_offset = mouse_pos - pygame.Vector2(h.graphic.rect.x, h.graphic.rect.y)
+                            h.graphic.grab_offset = mouse_pos - pygame.Vector2(
+                                h.graphic.rect.x, h.graphic.rect.y
+                            )
                             h.graphic.grabbed = True
                 if middle:
                     print(pygame.mouse.get_pos())
@@ -291,8 +234,10 @@ class InputSystem(System):
                 if not self.left_down:
                     continue
                 self.left_down = left
-                
-                handleable = set(Entity.filter("hero_card")) & set(Entity.filter("graphic"))
+
+                handleable = set(Entity.filter("hero_card")) & set(
+                    Entity.filter("graphic")
+                )
                 grabbed = [h for h in handleable if h.graphic.grabbed]
                 for h in grabbed:
                     handle = h.graphic
@@ -300,24 +245,16 @@ class InputSystem(System):
                     if play_rect.colliderect(handle.rect):
                         System.inject({"type": "play_card", "card": h.id})
 
-class GameState:
+
+"""ECS"""
+
+
+class Game:
     """Global game state"""
 
     def __init__(self):
-        self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
-        self.object_handles = []
-        self.named_objects = {}
-        self.won = False
         self.clock = pygame.time.Clock()
 
-        self.hcps = None
-        self.eds = None
-        self.hcgs = None
-        self.ins = None
-
-        self.init_objects()
-
-    def init_objects(self):
         data = wait_for_data()
         message = json.loads(data)
         game = jsonpickle.decode(message["game"])
@@ -325,13 +262,16 @@ class GameState:
         self.eds = game["EnemyDeckSystem"]
         Entity.reset(**game["Entity"])
         System.reset(**game["System"])
+
         self.ins = InputSystem()
 
         for card_id in self.eds.deck + [self.eds.boss]:
             card = Entity.get(card_id)
             if card_id == self.eds.top_enemy:
                 card.attach(Component("graphic"))
-                card.graphic.asset = pygame.transform.scale(pygame.image.load(f"{card.meta.name}.jpg"), (100, 150))
+                card.graphic.asset = pygame.transform.scale(
+                    pygame.image.load(f"{card.meta.name}.jpg"), (100, 150)
+                )
                 card.graphic.rect = card.graphic.asset.get_rect()
                 card.graphic.rect.x, card.graphic.rect.y = enemy_pos
                 for sg in Entity.filter("symbol_graphic"):
@@ -340,76 +280,81 @@ class GameState:
                     for i in range(count):
                         sg = Entity()
                         sg.attach(Component("graphic"))
-                        sg.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbol}.jpg"), (50, 50))
+                        sg.graphic.asset = pygame.transform.scale(
+                            pygame.image.load(f"{symbol}.jpg"), (50, 50)
+                        )
                         sg.graphic.rect = sg.graphic.asset.get_rect()
-                        sg.graphic.rect.x, sg.graphic.rect.y = symbol_pos[symbol] + pygame.Vector2(i * 50, 0)
+                        sg.graphic.rect.x, sg.graphic.rect.y = symbol_pos[
+                            symbol
+                        ] + pygame.Vector2(i * 50, 0)
 
         self.hcgs = HeroCardGraphicSystem(self.hcps)
 
-    def handle_action(self, action):
-        print("handling", action)
-        if action["action"] == "flip_enemy":
-            card = next(c for c in self.object_handles if c.fields.get(
-                "model_type", None) == "enemy" and c.fields["index"] == action["new_enemy_index"])
-            self.init_enemy(card)
-        elif action["action"] == "update_discard":
-            for hn, indices in action["heroes_to_indices"].items():
-                for o in [o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["index"] in indices]:
-                    if hn == hero_name:
-                        o.fields["position"] = {"area": "discard"}
-                    else:
-                        o.fields["position"] = {"area": "other_hero"}
-                    o.fields["visible"] = False
-                if hn + "_discard" in self.named_objects:
-                    self.named_objects[hn + "_discard"].set_text(str(len(indices)))
-        elif action["action"] == "play_card":
-            o = next(o for o in self.object_handles if o.fields.get(
-                "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
-            play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
-            o.fields["position"] = {
-                "area": "play_area",
-                "index": max(o.fields["position"]["index"] for o in play_stuff) + 1 if len(play_stuff) > 0 else 0,
-            }
-            o.fields["visible"] = True
-            hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
-            hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
-            for i, o in enumerate(hand_stuff):
-                o.fields["position"]["index"] = i
-        elif action["action"] == "draw_card":
-            if action["hero_name"] == hero_name:
-                for entity in action["entities"]:
-                    o = next(o for o in self.object_handles if o.fields.get(
-                        "model_type", None) == "hero_card" and o.fields["index"] == entity)
-                    if o.fields.get("position", {"area": None})["area"] != "hand":
-                        hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
-                        o.fields["position"] = {
-                            "area": "hand",
-                            "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
-                        }
-                        o.fields["visible"] = True
-            else:
-                if (o := self.named_objects.get(action["hero_name"] + "_hand", None)) is not None:
-                    o.set_text(str(action["new_hand_len"]))
-                if (o := self.named_objects.get(action["hero_name"] + "_deck", None)) is not None:
-                    o.set_text(str(action["new_deck_len"]))
-        elif action["action"] == "player_join":
-            self.init_other_hero(jsonpickle.decode(action["hero"]))
-        elif action["action"] == "win":
-            self.won = True
-        else:
-            print("unhandled action", action)
+    # def handle_action(self, action):
+    #     print("handling", action)
+    #     if action["action"] == "flip_enemy":
+    #         card = next(c for c in self.object_handles if c.fields.get(
+    #             "model_type", None) == "enemy" and c.fields["index"] == action["new_enemy_index"])
+    #         self.init_enemy(card)
+    #     elif action["action"] == "update_discard":
+    #         for hn, indices in action["heroes_to_indices"].items():
+    #             for o in [o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["index"] in indices]:
+    #                 if hn == hero_name:
+    #                     o.fields["position"] = {"area": "discard"}
+    #                 else:
+    #                     o.fields["position"] = {"area": "other_hero"}
+    #                 o.fields["visible"] = False
+    #             if hn + "_discard" in self.named_objects:
+    #                 self.named_objects[hn + "_discard"].set_text(str(len(indices)))
+    #     elif action["action"] == "play_card":
+    #         o = next(o for o in self.object_handles if o.fields.get(
+    #             "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
+    #         play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
+    #         o.fields["position"] = {
+    #             "area": "play_area",
+    #             "index": max(o.fields["position"]["index"] for o in play_stuff) + 1 if len(play_stuff) > 0 else 0,
+    #         }
+    #         o.fields["visible"] = True
+    #         hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
+    #         hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
+    #         for i, o in enumerate(hand_stuff):
+    #             o.fields["position"]["index"] = i
+    #     elif action["action"] == "draw_card":
+    #         if action["hero_name"] == hero_name:
+    #             for entity in action["entities"]:
+    #                 o = next(o for o in self.object_handles if o.fields.get(
+    #                     "model_type", None) == "hero_card" and o.fields["index"] == entity)
+    #                 if o.fields.get("position", {"area": None})["area"] != "hand":
+    #                     hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
+    #                     o.fields["position"] = {
+    #                         "area": "hand",
+    #                         "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
+    #                     }
+    #                     o.fields["visible"] = True
+    #         else:
+    #             if (o := self.named_objects.get(action["hero_name"] + "_hand", None)) is not None:
+    #                 o.set_text(str(action["new_hand_len"]))
+    #             if (o := self.named_objects.get(action["hero_name"] + "_deck", None)) is not None:
+    #                 o.set_text(str(action["new_deck_len"]))
+    #     elif action["action"] == "player_join":
+    #         self.init_other_hero(jsonpickle.decode(action["hero"]))
+    #     elif action["action"] == "win":
+    #         self.won = True
+    #     else:
+    #         print("unhandled action", action)
 
-    def step(self):
-        dt = self.clock.tick(framerate)
-        
-        if networking:
-            if not recv_q.empty():
-                response = json.loads(recv_q.get())
-                for action in response["actions"]:
-                    self.handle_action(action)
-                self.update_card_pos()
+    def run(self):
+        while should_close.value != 1:
+            dt = self.clock.tick(framerate)
 
-        System.update_all()
+            if networking:
+                if not recv_q.empty():
+                    response = json.loads(recv_q.get())
+                    for action in response["actions"]:
+                        self.handle_action(action)
+                    self.update_card_pos()
+
+            System.update_all()
 
 
 if __name__ == "__main__":
@@ -422,7 +367,7 @@ if __name__ == "__main__":
 
             p = Process(target=worker, args=(recv_q, send_q, should_close, should_init))
             p.start()
-    
+
         while should_init.value != 1:
             if should_close.value == 1:
                 raise Exception("closed before window initialized")
@@ -448,18 +393,21 @@ if __name__ == "__main__":
             ARROW: pygame.Vector2(750, 450),
             JUMP: pygame.Vector2(750, 500),
         }
-        other_hero_pos = dict(zip([hn for hn in ["Ranger", "Barbarian"] if hn != hero_name], [
-            pygame.Vector2(50, 50),
-            pygame.Vector2((1024 // 2) - 25, 50),
-            pygame.Vector2(1024 - 50 - 50, 50),
-        ]))
+        other_hero_pos = dict(
+            zip(
+                [hn for hn in ["Ranger", "Barbarian"] if hn != hero_name],
+                [
+                    pygame.Vector2(50, 50),
+                    pygame.Vector2((1024 // 2) - 25, 50),
+                    pygame.Vector2(1024 - 50 - 50, 50),
+                ],
+            )
+        )
 
         screen = pygame.display.set_mode(size)
 
         print("initialize game")
-        state = GameState()
-        while should_close.value != 1:
-            state.step()
+        Game().run()
     except Exception:
         print("error in UI thread")
         traceback.print_exc()
