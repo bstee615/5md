@@ -4,37 +4,37 @@ from flask import Flask, request
 import simple_websocket
 import random
 
-from model import ARROW, JUMP, SWORD, Game, SymbolCard
+from model import *
 app = Flask(__name__)
 
-game = Game()
-game.init_boss("Baby Barbarian")
-game.add_enemy("Slime", {SWORD: 2})
-game.add_enemy("Skeleton", {ARROW: 1})
-
 def make_hero(hero_name):
-    hero = game.add_hero(hero_name)
+    hero = Hero(hero_name)
+    deck = []
     if hero_name == "Barbarian":
-        hero.hand.append(SymbolCard({SWORD: 1}))
-        hero.hand.append(SymbolCard({JUMP: 1}))
-        hero.hand.append(SymbolCard({ARROW: 1}))
-        hero.deck = []
         for s in [SWORD, JUMP]:
-            for i in range(5):
-                hero.deck.append(SymbolCard({s: 1}))
-        random.shuffle(hero.deck)
+            for _ in range(5):
+                deck.append(SymbolCard({s: 1}))
     if hero_name == "Ranger":
-        hero.hand.append(SymbolCard({ARROW: 1}))
-        hero.hand.append(SymbolCard({ARROW: 1}))
-        hero.hand.append(SymbolCard({JUMP: 1}))
-        hero.deck = []
-        for s in [ARROW]:
-            for i in range(10):
-                hero.deck.append(SymbolCard({s: 1}))
-        random.shuffle(hero.deck)
-    return hero
+        for _ in range(10):
+            deck.append(SymbolCard({ARROW: 1}))
+    random.shuffle(deck)
+    return {
+        "id": hero,
+        "deck": deck,
+        "hand": [],
+        "discard": [],
+    }
 
-print(game)
+hcps = HeroCardPositionSystem([make_hero("Ranger"), make_hero("Barbarian")])
+eds = EnemyDeckSystem(
+    [
+        EnemyCard("Slime", {SWORD: 2}),
+        EnemyCard("Bear", {ARROW: 1}),
+        EnemyCard("Skeleton", {JUMP: 1}),
+    ],
+    BossCard("Baby Barbarian", {SWORD: 2, ARROW: 2, JUMP: 3}),
+    hcps,
+)
 
 """
 List of websockets.
@@ -49,25 +49,11 @@ loop through this collection to send the message.
 wss = []
 
 
-def run_command(data):
-    command = jsonpickle.decode(data)
-    send_to_all = False
-    if command["command"] == "play_hero_card":
-        result, actions = game.play_hero_card(
-            command["hero_name"], int(command["card_index"]))
-        ret = {
-            "command": "play_hero_card",
-            "result": result,
-            "actions": actions,
-        }
-        send_to_all = result != "error"
-    elif command["command"] == "init":
-        ret = {
-            "command": command,
-            "game": jsonpickle.encode(game)
-        }
+def run_command(message):
+    send_to_all = True
+    if message["message"] == "play_hero_card":
+        System.inject({"type": "play_card", "card": message["card"]})
     ret = json.dumps(ret)
-    print(ret)
     return ret, send_to_all
 
 
@@ -76,26 +62,35 @@ def run_game():
     ws = simple_websocket.Server(request.environ)
     wsi = len(wss)
     data = ws.receive()
-    command = json.loads(data)
-    assert command["command"] == "login", f"invalid command {command}"
-    hero_name = command["hero_name"]
-    hero = game.heroes.get(hero_name, make_hero(hero_name))
+    message = json.loads(data)
+    assert message["message"] == "login", f"invalid command {message}"
+    hero_name = message["hero_name"]
     for i, s in enumerate(wss):
         if s is not None:
             try:
                 s.send(json.dumps({
                     "actions": [{
                         "action": "player_join",
-                        "hero": jsonpickle.encode(hero),
+                        "hero": hero_name,
                     }],
                 }))
             except ConnectionResetError:
                 print("client", i, "disconnected")
                 wss[i] = None
+    ws.send(json.dumps({
+        "message": "init",
+        "game": jsonpickle.encode({
+            "HeroCardPositionSystem": hcps,
+            "EnemyDeckSystem": eds,
+            "Entity": Entity.serialize(),
+            "System": System.serialize(),
+        }),
+    }))
     wss.append(ws)
     try:
         while True:
             data = ws.receive()
+            message = json.loads(data)
             response, send_to_all = run_command(data)
             print(f"{response=}")
             if send_to_all:
@@ -109,6 +104,7 @@ def run_game():
             else:
                 print("send to requesting client", wsi)
                 ws.send(response)
+            System.update_all()
     except simple_websocket.ConnectionClosed:
         pass
     wsi[wsi] = None

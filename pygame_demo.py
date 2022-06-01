@@ -10,7 +10,7 @@ import simple_websocket
 from multiprocessing import Process, Queue, Value
 import sys
 
-from model import ARROW, JUMP, SWORD, Game, SymbolCard
+from model import *
 
 """NETWORKING"""
 if len(sys.argv) > 1:
@@ -36,7 +36,7 @@ def try_connect():
             print("error connecting to server:", retry_strikes, "strikes", e)
             time.sleep(1)
     if did_connect:
-        ws.send(json.dumps({"command": "login", "hero_name": hero_name}))
+        ws.send(json.dumps({"message": "login", "hero_name": hero_name}))
         return ws
     else:
         raise Exception("Error connecting to goodies")
@@ -60,7 +60,7 @@ def worker(recv_q, send_q, should_close, should_init):
                     break
                 data = ws.receive(0)
                 if data:
-                    print(f"{data=}")
+                    # print(f"{data=}")
                     recv_q.put(data)
                 while not send_q.empty():
                     cmd = send_q.get()
@@ -97,32 +97,14 @@ def close_network():
             p.join()
 
 
-def initialize_from_network():
-    if networking:
-        data = send_ws_command(jsonpickle.encode({"command": "init"}))
-        print("data =", repr(data))
-        response = json.loads(data)
-        print("response =", response)
-        return jsonpickle.decode(response["game"])
-    else:
-        # Dummy data
-        d = Game()
-        d.init_boss("Baby Barbarian")
-        ranger = d.add_hero(hero_name)
-        ranger.hand += [
-            SymbolCard({SWORD: 1}),
-            SymbolCard({ARROW: 1}),
-            SymbolCard({JUMP: 1})
-        ]
-        ranger.deck += [
-            *([SymbolCard({SWORD: 1})] * 5),
-            *([SymbolCard({ARROW: 1})] * 5),
-            *([SymbolCard({JUMP: 1})] * 5),
-        ]
-        random.shuffle(ranger.deck)
-        d.add_enemy("Slime", {SWORD: 2})
-        d.add_enemy("Skeleton", {ARROW: 1})
-        return d
+# def initialize_from_network():
+#     if networking:
+#         # print("data =", repr(data))
+#         response = json.loads(data)
+#         # print("response =", response)
+#         return jsonpickle.decode(response["game"])
+#     else:
+#         pass
 
 
 """NETWORKING"""
@@ -206,12 +188,13 @@ class GameState:
         self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
         self.object_handles = []
         self.named_objects = {}
-        self.enemy_symbols = []
         self.won = False
         self.clock = pygame.time.Clock()
 
-        game = initialize_from_network()
-        self.init_objects(game, hero_name)
+        self.hcps = None
+        self.eds = None
+
+        self.init_objects()
 
     def move_card_to(self, card_obj, position):
         if position["area"] == "hand":
@@ -245,7 +228,6 @@ class GameState:
                 self.object_handles.pop(i)
             else:
                 i += 1
-        self.enemy_symbols = []
         for symbol, count in card_obj.fields["symbols"].items():
             for i in range(count):
                 symbol_obj = self.add_object(
@@ -256,7 +238,6 @@ class GameState:
                 symbol_obj.set_pos(
                     symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
                 symbol_obj.fields["model_type"] = "symbol"
-                self.enemy_symbols.append(symbol_obj)
 
     def create_card(self, hero_name, card, position, visible=True):
         card_obj = self.add_object(
@@ -281,27 +262,37 @@ class GameState:
         for card in other_hero.hand + other_hero.deck + other_hero.discard:
             self.create_card(other_hero.name, card, {"area": "other_player"}, False)
 
-    def init_objects(self, game, hero_name):
+    def init_objects(self):
+        data = wait_for_data()
+        message = json.loads(data)
+        game = jsonpickle.decode(message["game"])
+        self.hcps = game["HeroCardPositionSystem"]
+        self.eds = game["EnemyDeckSystem"]
+        Entity.reset(**game["Entity"])
+        System.reset(**game["System"])
+        
         enemy_board = self.add_object(pygame.transform.scale(
             pygame.image.load("playing_board.jpg"), (250, 100)))
         enemy_board.set_pos(pygame.Vector2(650, 400))
 
         self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
 
-        enemy_index = game.top_enemy().index
-        for i, card in enumerate(game.enemy_deck + [game.boss]):
-            card_obj = self.add_object(
-                pygame.transform.scale(pygame.image.load(
-                    f"{card.name}.jpg"), (100, 150)),
-                draggable=True,
-            )
-            card_obj.fields["index"] = card.index
-            card_obj.fields["model_type"] = "enemy"
-            card_obj.fields["symbols"] = card.symbols
-            if card.index == enemy_index:
-                self.init_enemy(card_obj)
-            else:
-                card_obj.set_pos(enemy_pos)
+        for card_id in self.eds.deck + [self.eds.boss]:
+            card = Entity.get(card_id)
+            if card_id == self.eds.top_enemy:
+                card.attach(Component("graphic"))
+                card.graphic.asset = pygame.transform.scale(pygame.image.load(f"{card.meta.name}.jpg"), (100, 150))
+                card.graphic.position = enemy_pos
+                for sg in Entity.filter("symbol_graphic"):
+                    sg.graphic.visible = False  # TODO: delete
+                for symbol, count in card.symbol_count.symbols.items():
+                    for i in range(count):
+                        sg = Entity()
+                        sg.attach(Component("graphic"))
+                        sg.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbol}.jpg"), (50, 50))
+                        sg.graphic.position = symbol_pos[symbol] + pygame.Vector2(i * 50, 0)
+
+        return ## TODO: implement the rest
 
         for other_hero in [h for n, h in game.heroes.items() if n != hero_name]:
             self.init_other_hero(other_hero)
@@ -405,7 +396,7 @@ class GameState:
                     o.fields["handle"].grabbed = False
                     if play_rect.colliderect(o_rect) and o.fields.get("position", {"area": None})["area"] == "hand":
                         data = send_ws_command(json.dumps({
-                            "command": "play_hero_card",
+                            "message": "play_hero_card",
                             "hero_name": hero_name,
                             "card_index": o.fields["index"],
                         }))
@@ -472,13 +463,8 @@ class GameState:
                         o.set_pos(self.mouse_pos - o_handle.grab_offset)
 
         screen.blit(background, (0, 0))
-        for o in self.object_handles:
-            if not o.fields["visible"]:
-                continue
-            if isinstance(o.fields["object"], pygame.Surface):
-                screen.blit(o.fields["object"], o.fields["rect"])
-            elif isinstance(o.fields["object"], pygame.Rect):
-                pygame.draw.rect(screen, "red", o.fields["rect"], width=5)
+        for e in Entity.filter("graphic"):
+            screen.blit(e.graphic.asset, e.graphic.position)
         pygame.display.flip()
 
 

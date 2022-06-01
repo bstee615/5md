@@ -6,6 +6,13 @@ https://www.reddit.com/r/roguelikedev/comments/9ug11a/entitycomponentsystem_impl
 
 import uuid
 import json
+from types import SimpleNamespace
+
+import jsonpickle
+
+
+def get_id():
+    return uuid.uuid4()
 
 
 # Returns a python dictionary given a file containing a JSON-based
@@ -21,9 +28,24 @@ import json
 #             "name": ""
 #         }
 #     }
-def Component(filename):
-    with open(filename + '.json', 'r') as f:
-        return json.load(f)
+class Component(SimpleNamespace):
+    def __init__(self, filename=None, **kwargs):
+        if filename is not None:
+            with open(filename + '.json', 'r') as f:
+                d = json.load(f)
+            super().__init__(type=d["type"], **d["schema"], **kwargs)
+        else:
+            super().__init__(**kwargs)
+
+# @jsonpickle.handlers.register(Component)
+# class ComponentHandler(jsonpickle.handlers.BaseHandler):
+#     def flatten(self, obj, data):
+#         data['typecode'] = obj.typecode
+#         data['values'] = self.context.flatten(obj.tolist(), reset=False)
+#         return data
+
+#     def restore(self, data):
+#         return SimpleNamespace()
 
 
 # The Entity class defines a single entity in our system composed
@@ -97,34 +119,45 @@ class Entity(object):
     cindex = {}  # Index mapping component names to entity objects
 
     @classmethod
-    def reset(cls):
-        cls.eindex = {}
-        cls.cindex = {}
+    def reset(cls, eindex=None, cindex=None):
+        if eindex is None:
+            eindex = {}
+        if cindex is None:
+            cindex = {}
+        cls.eindex = eindex
+        cls.cindex = cindex
+
+    @classmethod
+    def serialize(cls):
+        return {
+            "eindex": cls.eindex,
+            "cindex": cls.cindex,
+        }
 
     def __init__(self):
-        self.id = str(uuid.uuid4())
+        self.id = str(get_id())
         self.components = []
         self.eindex[self.id] = self  # Assumes ID's never collide
 
-    def attach(self, component, namespace=None):
+    def attach(self, component):
         # Append component name to list of components
-        self.components.append(component['type'])
+        self.components.append(component.type)
         # Create a raw 'Component' object based on the JSON schema
-        key = namespace if namespace else component['type']
-        self.__dict__[key] = type('Component', (), component['schema'])()
+        key = component.type
+        self.__dict__[key] = component
         # Add to component index
-        if component['type'] not in self.cindex:
-            self.cindex[component['type']] = []
-        self.cindex[component['type']].append(self)
+        if component.type not in self.cindex:
+            self.cindex[component.type] = []
+        self.cindex[component.type].append(self)
 
     @classmethod
-    def filter(cls, component):
-        entities = cls.cindex.get(component)
+    def filter(cls, component_type):
+        entities = cls.cindex.get(component_type)
         return entities if entities is not None else []
 
     @classmethod
-    def filter_id(cls, component):
-        entities = cls.cindex.get(component)
+    def filter_id(cls, component_type):
+        entities = cls.cindex.get(component_type)
         return [e.id for e in entities] if entities is not None else []
 
     @classmethod
@@ -202,9 +235,20 @@ class System(object):
     subscriptions = {}
 
     @classmethod
-    def reset(cls):
+    def reset(cls, systems=None, subscriptions=None):
+        if systems is None:
+            systems = {}
+        if subscriptions is None:
+            subscriptions = {}
         cls.systems = []
         cls.subscriptions = {}
+
+    @classmethod
+    def serialize(cls):
+        return {
+            "systems": cls.systems,
+            "subscriptions": cls.subscriptions,
+        }
 
     def __init__(self):
         self.events = []
