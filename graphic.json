@@ -2,7 +2,7 @@
     "type": "graphic",
     "schema": {
         "asset": null,
-        "position": null,
+        "position": [0, 0],
         "visible": true
     }
 }

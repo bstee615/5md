@@ -26,6 +26,7 @@ def make_hero(hero_name):
     }
 
 hcps = HeroCardPositionSystem([make_hero("Ranger"), make_hero("Barbarian")])
+hcps.play_area.append(SymbolCard({ARROW: 1}).id)
 eds = EnemyDeckSystem(
     [
         EnemyCard("Slime", {SWORD: 2}),

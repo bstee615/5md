@@ -192,6 +192,14 @@ class HeroCardGraphicSystem(System):
             card.attach(Component("graphic"))
             card.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbols_to_name(card.symbol_count.symbols)}.jpg"), (100, 150))
             card.graphic.visible = False
+            
+        for i, card_id in enumerate(hcps.play_area):
+            card = Entity.get(card_id)
+            card_offset = 125
+            x = card_offset * i
+            print("x", x)
+            card.graphic.position = pygame.Vector2(play_pos + pygame.Vector2(x, 0))
+            card.graphic.visible = True
 
         for hero_id in hcps.heroes:
             hero = Entity.get(hero_id)
@@ -205,7 +213,6 @@ class HeroCardGraphicSystem(System):
                 num_cards_in_hand = len(hcps.hand[hero_id])
                 x = ((1024 // 2) - 50 - ((space_between_cards * num_cards_in_hand) // 2) + (space_between_cards * i))
                 y = 600
-                print(card, x, y)
                 card.graphic.position = pygame.Vector2(x, y)
                 card.graphic.visible = True
             player_discard = Entity()
@@ -341,18 +348,6 @@ class GameState:
         self.hcgs = HeroCardGraphicSystem(self.hcps)
             
         return ## TODO: implement the rest
-
-        for i, card in enumerate(game.heroes[hero_name].hand):
-            self.create_card(hero_name, card, {"area": "hand", "index": i})
-
-        for i, card in enumerate(game.heroes[hero_name].discard):
-            card_obj = self.create_card(hero_name, card, {"area": "discard"}, False)
-        for i, card in enumerate(game.heroes[hero_name].deck):
-            card_obj = self.create_card(hero_name, card, {"area": "deck"}, False)
-        player_discard = self.add_object(font.render(str(len(game.heroes[hero_name].discard)), True, BLUE), hero_name + "_discard")
-        player_discard.set_pos(discard_pos)
-        player_deck = self.add_object(font.render(str(len(game.heroes[hero_name].deck)), True, BLUE), hero_name + "_deck")
-        player_deck.set_pos(deck_pos)
 
         for i, (_, card) in enumerate(game.hero_cards_played):
             card_obj = self.create_card(hero_name, card, {"area": "play_area", "index": i})
@@ -542,6 +537,7 @@ if __name__ == "__main__":
 
         enemy_pos = pygame.Vector2(750, 200)
         discard_pos = pygame.Vector2(900, 600)
+        play_pos = pygame.Vector2(200, 200)
         deck_pos = pygame.Vector2(100, 600)
         symbol_pos = {
             SWORD: pygame.Vector2(750, 400),
