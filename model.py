@@ -117,7 +117,6 @@ class HeroCardPositionSystem(System):
     def update(self):
         events = self.pending()
         for ev in events:
-            print("HeroCardPositionSystem", ev)
             if ev["type"] == "draw_cards":
                 hero = ev["hero"]
                 card_limit = 3

@@ -11,6 +11,7 @@ app = Flask(__name__)
 
 def make_hero(hero_name):
     hero = Hero(hero_name)
+    print(hero.id)
     deck = []
     if hero_name == "Barbarian":
         for s in [SWORD, JUMP]:
@@ -28,8 +29,13 @@ def make_hero(hero_name):
     }
 
 
-hcps = HeroCardPositionSystem([make_hero("Ranger"), make_hero("Barbarian")])
-hcps.play_area.append(SymbolCard({ARROW: 1}).id)
+ranger = make_hero("Ranger")
+barb = make_hero("Barbarian")
+hcps = HeroCardPositionSystem([ranger, barb])
+new_card = SymbolCard({ARROW: 1})
+hcps.play_area.append(new_card.id)
+hcps.card_hero[new_card.id] = ranger["id"].id
+hcps.hero_card[ranger["id"].id].append(new_card.id)
 eds = EnemyDeckSystem(
     [
         EnemyCard("Slime", {SWORD: 2}),

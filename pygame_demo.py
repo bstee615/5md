@@ -171,14 +171,25 @@ class HeroCardGraphicSystem(System):
                 player_deck.graphic.rect.y = deck_pos.y
                 self.player_deck = player_deck
 
+    def update_deck(self):
+        old_rect = self.player_deck.graphic.rect
+        self.player_deck.graphic.asset = font.render(str(len(self.hcps.deck[self.my_hero_id])), True, BLUE)
+        self.player_deck.graphic.rect = self.player_deck.graphic.asset.get_rect()
+        self.player_deck.graphic.rect.move_ip(pygame.Vector2(old_rect.x, old_rect.y))
+
+    def update_discard(self):
+        old_rect = self.player_discard.graphic.rect
+        self.player_discard.graphic.asset = font.render(str(len(self.hcps.discard[self.my_hero_id])), True, BLUE)
+        self.player_discard.graphic.rect = self.player_discard.graphic.asset.get_rect()
+        self.player_discard.graphic.rect.move_ip(pygame.Vector2(old_rect.x, old_rect.y))
+
     def update(self):
         events = self.pending()
         for ev in events:
             if ev["type"] == "flip_enemy":
-                old_rect = self.player_deck.graphic.rect
-                self.player_deck.graphic.asset = font.render(str(len(self.hcps.discard[self.my_hero_id])), True, BLUE)
-                self.player_deck.graphic.rect = self.player_deck.graphic.asset.get_rect()
-                self.player_deck.graphic.rect.move_ip(pygame.Vector2(old_rect.x, old_rect.y))
+                print("flip_enemy")
+                self.update_deck()
+                self.update_discard()
                 for o in self.hcps.play_area:
                     Entity.get(o).graphic.visible = False
             elif ev["type"] == "play_card":
@@ -187,6 +198,7 @@ class HeroCardGraphicSystem(System):
                 new_pos = play_pos + pygame.Vector2(125 * len(self.hcps.play_area), 0)
                 card.graphic.rect.x, card.graphic.rect.y = new_pos
             elif ev["type"] == "draw_cards":
+                self.update_deck()
                 if ev["hero"] == self.my_hero_id:
                     hand = self.hcps.hand[ev["hero"]]
                     for i, card_id in enumerate(hand):
