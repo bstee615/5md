@@ -96,6 +96,11 @@ class Entity(object):
     eindex = {}  # Index mapping entity IDs to entity objects
     cindex = {}  # Index mapping component names to entity objects
 
+    @classmethod
+    def reset(cls):
+        cls.eindex = {}
+        cls.cindex = {}
+
     def __init__(self):
         self.id = str(uuid.uuid4())
         self.components = []
@@ -116,6 +121,11 @@ class Entity(object):
     def filter(cls, component):
         entities = cls.cindex.get(component)
         return entities if entities is not None else []
+
+    @classmethod
+    def filter_id(cls, component):
+        entities = cls.cindex.get(component)
+        return [e.id for e in entities] if entities is not None else []
 
     @classmethod
     def get(cls, eid):
@@ -191,6 +201,11 @@ class System(object):
     systems = []
     subscriptions = {}
 
+    @classmethod
+    def reset(cls):
+        cls.systems = []
+        cls.subscriptions = {}
+
     def __init__(self):
         self.events = []
         self.systems.append(self)
@@ -202,9 +217,8 @@ class System(object):
 
     def pending(self):
         # Get pending events and clear queue
-        ret = self.events
+        yield from self.events
         self.events = []
-        return ret
 
     @classmethod
     def inject(cls, event):
