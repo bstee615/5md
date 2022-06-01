@@ -48,21 +48,37 @@ def Hero(name):
     return me
 
 
-class EmitSystem(System):
-    def __init__(self, server):
-        super().__init__()
-        self.subscribe("add_hero")
-        self.subscribe("flip_enemy")
-        self.subscribe("play_card")
-        self.subscribe("clear_play_area")
-        self.server = server
+class EchoEmitSystem(System):
+    def __init__(self):
+        super().__init__(prioritize=True)
+        self.subscribe("remote_event")
 
     def update(self):
         events = self.pending()
         for ev in events:
-            self.server.send(
+            print("remote event", ev)
+            ev_ev = ev["event"]
+            ev_ev["remote"] = True
+            self.inject(ev_ev)
+
+
+class EmitSystem(System):
+    def __init__(self, send_fn, name):
+        super().__init__(prioritize=True)
+        self.subscribe("add_hero")
+        self.subscribe("flip_enemy")
+        self.subscribe("play_card")
+        self.subscribe("clear_play_area")
+        self.send_fn = send_fn
+        self.name = name
+
+    def update(self):
+        events = self.pending()
+        for ev in events:
+            self.send_fn(
                 {
-                    "message": "event",
+                    "type": "remote_event",
+                    "sender": self.name,
                     "event": ev,
                 }
             )
@@ -94,11 +110,12 @@ class HeroCardPositionSystem(System):
             self.discard[hero_id] = discard
             self.hero_card[hero_id] = all_cards
             for card in all_cards:
-                self.card_hero[card] = hero["id"]
+                self.card_hero[card] = hero["id"].id
 
     def update(self):
         events = self.pending()
         for ev in events:
+            print("HeroCardPositionSystem", ev)
             if ev["type"] == "draw_cards":
                 hero = ev["hero"]
                 card_limit = 3

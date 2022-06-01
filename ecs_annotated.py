@@ -250,9 +250,12 @@ class System(object):
             "subscriptions": cls.subscriptions,
         }
 
-    def __init__(self):
+    def __init__(self, prioritize=False):
         self.events = []
-        self.systems.append(self)
+        if prioritize:
+            self.systems.insert(0, self)
+        else:
+            self.systems.append(self)
 
     def subscribe(self, event_type):
         if event_type not in self.subscriptions:

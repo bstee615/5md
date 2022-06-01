@@ -39,6 +39,7 @@ eds = EnemyDeckSystem(
     BossCard("Baby Barbarian", {SWORD: 2, ARROW: 2, JUMP: 3}),
     hcps,
 )
+ees = EchoEmitSystem()
 
 """
 List of websockets.
@@ -53,17 +54,10 @@ loop through this collection to send the message.
 wss = []
 
 
-def run_command(message):
-    send_to_all = True
-    if message["message"] == "play_hero_card":
-        System.inject({"type": "play_card", "card": message["card"]})
-    ret = json.dumps(ret)
-    return ret, send_to_all
-
-
 @app.route("/game", websocket=True)
 def run_game():
     ws = simple_websocket.Server(request.environ)
+    es = EmitSystem(lambda m: ws.send(json.dumps(m)), "server")
     wsi = len(wss)
     data = ws.receive()
     message = json.loads(data)
@@ -84,7 +78,7 @@ def run_game():
                         }
                     )
                 )
-            except ConnectionResetError:
+            except (ConnectionResetError, simple_websocket.ConnectionClosed) as e:
                 print("client", i, "disconnected")
                 wss[i] = None
     ws.send(
@@ -107,19 +101,20 @@ def run_game():
         while True:
             data = ws.receive()
             message = json.loads(data)
-            response, send_to_all = run_command(data)
-            print(f"{response=}")
-            if send_to_all:
-                for i, s in enumerate(wss):
-                    try:
-                        if s is not None:
-                            print("send to other client", i)
-                            s.send(response)
-                    except ConnectionResetError:
-                        print("client", i, "disconnected")
-            else:
-                print("send to requesting client", wsi)
-                ws.send(response)
+            print(message)
+            System.inject(message)
+            # print(f"{response=}")
+            # if send_to_all:
+            #     for i, s in enumerate(wss):
+            #         try:
+            #             if s is not None:
+            #                 print("send to other client", i)
+            #                 s.send(response)
+            #         except ConnectionResetError:
+            #             print("client", i, "disconnected")
+            # else:
+            #     print("send to requesting client", wsi)
+            #     ws.send(response)
             System.update_all()
     except simple_websocket.ConnectionClosed:
         pass

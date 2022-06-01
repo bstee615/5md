@@ -1,3 +1,4 @@
+import functools
 import json
 import time
 import jsonpickle
@@ -60,7 +61,6 @@ def worker(recv_q, send_q, should_close, should_init):
                     break
                 data = ws.receive(0)
                 if data:
-                    # print(f"{data=}")
                     recv_q.put(data)
                 while not send_q.empty():
                     cmd = send_q.get()
@@ -87,7 +87,7 @@ def wait_for_data():
 def send_ws_command(cmd, wait_for_response=True):
     print("send_ws_command", cmd)
     if networking:
-        send_q.put(cmd)
+        send_q.put(json.dumps(cmd))
         if wait_for_response:
             return wait_for_data()
 
@@ -114,6 +114,8 @@ class HeroCardGraphicSystem(System):
         self.subscribe("draw_cards")
         self.subscribe("flip_enemy")
 
+        self.hcps = hcps
+
         for card in Entity.filter("hero_card"):
             card.attach(Component("graphic"))
             card.graphic.asset = pygame.transform.scale(
@@ -128,51 +130,80 @@ class HeroCardGraphicSystem(System):
             card_offset = 125
             x = card_offset * i
             card.graphic.rect = card.graphic.asset.get_rect()
-            card.graphic.rect.x, card.graphic.rect.y = play_pos
+            card.graphic.rect.x, card.graphic.rect.y = play_pos + pygame.Vector2(x, 0)
             card.graphic.visible = True
 
         for hero_id in hcps.heroes:
             hero = Entity.get(hero_id)
             if hero.meta.name == hero_name:
-                pass
-            else:
-                pass
-            for i, card_id in enumerate(hcps.hand[hero_id]):
-                card = Entity.get(card_id)
-                space_between_cards = 125
-                num_cards_in_hand = len(hcps.hand[hero_id])
-                x = (
-                    (1024 // 2)
-                    - 50
-                    - ((space_between_cards * num_cards_in_hand) // 2)
-                    + (space_between_cards * i)
+                self.my_hero_id = hero_id
+                for i, card_id in enumerate(hcps.hand[hero_id]):
+                    card = Entity.get(card_id)
+                    space_between_cards = 125
+                    num_cards_in_hand = len(hcps.hand[hero_id])
+                    x = (
+                        (1024 // 2)
+                        - 50
+                        - ((space_between_cards * num_cards_in_hand) // 2)
+                        + (space_between_cards * i)
+                    )
+                    y = 600
+                    card.graphic.rect.x = x
+                    card.graphic.rect.y = y
+                    card.graphic.visible = True
+                player_discard = Entity()
+                player_discard.attach(Component("graphic"))
+                player_discard.graphic.asset = font.render(
+                    str(len(hcps.discard[hero_id])), True, BLUE
                 )
-                y = 600
-                card.graphic.rect.x = x
-                card.graphic.rect.y = y
-                card.graphic.visible = True
-            player_discard = Entity()
-            player_discard.attach(Component("graphic"))
-            player_discard.graphic.asset = font.render(
-                str(len(hcps.discard[hero_id])), True, BLUE
-            )
-            player_discard.graphic.rect = card.graphic.asset.get_rect()
-            player_discard.graphic.rect.x = deck_pos.x
-            player_discard.graphic.rect.y = deck_pos.y
-            player_deck = Entity()
-            player_deck.attach(Component("graphic"))
-            player_deck.graphic.asset = font.render(
-                str(len(hcps.deck[hero_id])), True, BLUE
-            )
-            player_deck.graphic.rect = card.graphic.asset.get_rect()
-            player_deck.graphic.rect.x = deck_pos.x
-            player_deck.graphic.rect.y = deck_pos.y
+                player_discard.graphic.rect = card.graphic.asset.get_rect()
+                player_discard.graphic.rect.x = discard_pos.x
+                player_discard.graphic.rect.y = discard_pos.y
+                self.player_discard = player_discard
+
+                player_deck = Entity()
+                player_deck.attach(Component("graphic"))
+                player_deck.graphic.asset = font.render(
+                    str(len(hcps.deck[hero_id])), True, BLUE
+                )
+                player_deck.graphic.rect = card.graphic.asset.get_rect()
+                player_deck.graphic.rect.x = deck_pos.x
+                player_deck.graphic.rect.y = deck_pos.y
+                self.player_deck = player_deck
 
     def update(self):
         events = self.pending()
         for ev in events:
-            # if ev["type"] == "draw_cards":
-            pass
+            if ev["type"] == "flip_enemy":
+                old_rect = self.player_deck.graphic.rect
+                self.player_deck.graphic.asset = font.render(str(len(self.hcps.discard[self.my_hero_id])), True, BLUE)
+                self.player_deck.graphic.rect = self.player_deck.graphic.get_rect()
+                self.player_deck.graphic.rect.move_ip(pygame.Vector2(old_rect.x, old_rect.y))
+                for o in self.play_area:
+                    o.graphic.visible = False
+            elif ev["type"] == "play_card":
+                card = Entity.get(ev["card"])
+                card.graphic.visible = True
+                new_pos = play_pos + pygame.Vector2(125 * len(self.hcps.play_area), 0)
+                card.graphic.rect.x, card.graphic.rect.y = new_pos
+            elif ev["type"] == "draw_cards":
+                if ev["hero"] == self.my_hero_id:
+                    hand = self.hcps.hand[ev["hero"]]
+                    for i, card_id in enumerate(hand):
+                        card = Entity.get(card_id)
+                        card.graphic.visible = True
+                        space_between_cards = 125
+                        num_cards_in_hand = len(hand)
+                        x = (
+                            (1024 // 2)
+                            - 50
+                            - ((space_between_cards * num_cards_in_hand) // 2)
+                            + (space_between_cards * i)
+                        )
+                        y = 600
+                        card.graphic.rect.x, card.graphic.rect.y = x, y
+            elif ev["type"] == "win":
+                self.won = True
 
         mouse_pos = get_mouse_pos()
         graphic_handles = [
@@ -221,6 +252,7 @@ class InputSystem(System):
                     handleable = set(Entity.filter("hero_card")) & set(
                         Entity.filter("graphic")
                     )
+                    grabbed = [h for h in handleable if h.graphic.visible]
                     for h in handleable:
                         hr = h.graphic.rect
                         if hr.collidepoint(mouse_pos):
@@ -240,9 +272,8 @@ class InputSystem(System):
                 )
                 grabbed = [h for h in handleable if h.graphic.grabbed]
                 for h in grabbed:
-                    handle = h.graphic
-                    handle.grabbed = False
-                    if play_rect.colliderect(handle.rect):
+                    h.graphic.grabbed = False
+                    if play_rect.colliderect(h.graphic.rect):
                         System.inject({"type": "play_card", "card": h.id})
 
 
@@ -261,9 +292,12 @@ class Game:
         self.hcps = game["HeroCardPositionSystem"]
         self.eds = game["EnemyDeckSystem"]
         Entity.reset(**game["Entity"])
-        System.reset(**game["System"])
 
         self.ins = InputSystem()
+        self.es = EmitSystem(functools.partial(send_ws_command, wait_for_response=False), "server")
+        self.ees = EchoEmitSystem()
+        # System.reset(**game["System"])
+        # print("subscriptions", System.subscriptions)
 
         for card_id in self.eds.deck + [self.eds.boss]:
             card = Entity.get(card_id)
@@ -289,70 +323,27 @@ class Game:
                         ] + pygame.Vector2(i * 50, 0)
 
         self.hcgs = HeroCardGraphicSystem(self.hcps)
-
-    # def handle_action(self, action):
-    #     print("handling", action)
-    #     if action["action"] == "flip_enemy":
-    #         card = next(c for c in self.object_handles if c.fields.get(
-    #             "model_type", None) == "enemy" and c.fields["index"] == action["new_enemy_index"])
-    #         self.init_enemy(card)
-    #     elif action["action"] == "update_discard":
-    #         for hn, indices in action["heroes_to_indices"].items():
-    #             for o in [o for o in self.object_handles if o.fields.get("model_type", None) == "hero_card" and o.fields["index"] in indices]:
-    #                 if hn == hero_name:
-    #                     o.fields["position"] = {"area": "discard"}
-    #                 else:
-    #                     o.fields["position"] = {"area": "other_hero"}
-    #                 o.fields["visible"] = False
-    #             if hn + "_discard" in self.named_objects:
-    #                 self.named_objects[hn + "_discard"].set_text(str(len(indices)))
-    #     elif action["action"] == "play_card":
-    #         o = next(o for o in self.object_handles if o.fields.get(
-    #             "model_type", None) == "hero_card" and o.fields["index"] == action["entity"])
-    #         play_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "play_area", self.object_handles))
-    #         o.fields["position"] = {
-    #             "area": "play_area",
-    #             "index": max(o.fields["position"]["index"] for o in play_stuff) + 1 if len(play_stuff) > 0 else 0,
-    #         }
-    #         o.fields["visible"] = True
-    #         hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
-    #         hand_stuff = list(sorted(hand_stuff, key=lambda o: o.fields["position"]["index"]))
-    #         for i, o in enumerate(hand_stuff):
-    #             o.fields["position"]["index"] = i
-    #     elif action["action"] == "draw_card":
-    #         if action["hero_name"] == hero_name:
-    #             for entity in action["entities"]:
-    #                 o = next(o for o in self.object_handles if o.fields.get(
-    #                     "model_type", None) == "hero_card" and o.fields["index"] == entity)
-    #                 if o.fields.get("position", {"area": None})["area"] != "hand":
-    #                     hand_stuff = list(filter(lambda o: "position" in o.fields and o.fields["position"]["area"] == "hand", self.object_handles))
-    #                     o.fields["position"] = {
-    #                         "area": "hand",
-    #                         "index": max(o.fields["position"]["index"] for o in hand_stuff) + 1 if len(hand_stuff) > 0 else 0,
-    #                     }
-    #                     o.fields["visible"] = True
-    #         else:
-    #             if (o := self.named_objects.get(action["hero_name"] + "_hand", None)) is not None:
-    #                 o.set_text(str(action["new_hand_len"]))
-    #             if (o := self.named_objects.get(action["hero_name"] + "_deck", None)) is not None:
-    #                 o.set_text(str(action["new_deck_len"]))
-    #     elif action["action"] == "player_join":
-    #         self.init_other_hero(jsonpickle.decode(action["hero"]))
-    #     elif action["action"] == "win":
-    #         self.won = True
-    #     else:
-    #         print("unhandled action", action)
+        System.systems.append(self.hcps)
+        System.systems.append(self.eds)
+        self.hcps.subscribe("add_hero")
+        self.hcps.subscribe("play_card")
+        self.hcps.subscribe("draw_cards")
+        self.hcps.subscribe("flip_enemy")
+        self.eds.subscribe("add_hero")
+        self.eds.subscribe("flip_enemy")
+        self.eds.subscribe("play_card")
+        self.eds.subscribe("clear_play_area")
 
     def run(self):
         while should_close.value != 1:
             dt = self.clock.tick(framerate)
 
-            if networking:
-                if not recv_q.empty():
-                    response = json.loads(recv_q.get())
-                    for action in response["actions"]:
-                        self.handle_action(action)
-                    self.update_card_pos()
+            # if networking:
+            #     if not recv_q.empty():
+            #         response = json.loads(recv_q.get())
+            #         for action in response["actions"]:
+            #             self.handle_action(action)
+            #         self.update_card_pos()
 
             System.update_all()
 
