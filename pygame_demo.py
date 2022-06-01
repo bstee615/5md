@@ -180,6 +180,50 @@ class MyObject:
     def __repr__(self):
         return f"{self.fields}"
 
+class HeroCardGraphicSystem(System):
+    def __init__(self, hcps):
+        super().__init__()
+        self.subscribe("add_hero")
+        self.subscribe("play_card")
+        self.subscribe("draw_cards")
+        self.subscribe("flip_enemy")
+
+        for card in Entity.filter("hero_card"):
+            card.attach(Component("graphic"))
+            card.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbols_to_name(card.symbol_count.symbols)}.jpg"), (100, 150))
+            card.graphic.visible = False
+
+        for hero_id in hcps.heroes:
+            hero = Entity.get(hero_id)
+            if hero.meta.name == hero_name:
+                pass
+            else:
+                pass
+            for i, card_id in enumerate(hcps.hand[hero_id]):
+                card = Entity.get(card_id)
+                space_between_cards = 125
+                num_cards_in_hand = len(hcps.hand[hero_id])
+                x = ((1024 // 2) - 50 - ((space_between_cards * num_cards_in_hand) // 2) + (space_between_cards * i))
+                y = 600
+                print(card, x, y)
+                card.graphic.position = pygame.Vector2(x, y)
+                card.graphic.visible = True
+            player_discard = Entity()
+            player_discard.attach(Component("graphic"))
+            player_discard.graphic.asset = font.render(str(len(hcps.discard[hero_id])), True, BLUE)
+            player_discard.graphic.position = discard_pos
+            player_deck = Entity()
+            player_deck.attach(Component("graphic"))
+            player_deck.graphic.asset = font.render(str(len(hcps.deck[hero_id])), True, BLUE)
+            player_deck.graphic.position = deck_pos
+
+    
+    def update(self):
+        events = self.pending()
+        for ev in events:
+            # if ev["type"] == "draw_cards":
+            pass
+
 
 class GameState:
     """Global game state"""
@@ -220,47 +264,48 @@ class GameState:
             base_pos = other_hero_pos[position["hero_name"]]
             card_obj.set_pos(base_pos + pygame.Vector2(position["index"] * 60, 0))
 
-    def init_enemy(self, card_obj):
-        card_obj.set_pos(enemy_pos)
-        i = 0
-        while i < len(self.object_handles):
-            if "model_type" in self.object_handles[i].fields and self.object_handles[i].fields["model_type"] == "symbol":
-                self.object_handles.pop(i)
-            else:
-                i += 1
-        for symbol, count in card_obj.fields["symbols"].items():
-            for i in range(count):
-                symbol_obj = self.add_object(
-                    pygame.transform.scale(
-                        pygame.image.load(f"{symbol}.jpg"), (50, 50)),
-                    draggable=True
-                )
-                symbol_obj.set_pos(
-                    symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
-                symbol_obj.fields["model_type"] = "symbol"
+    # def init_enemy(self, card_obj):
+    #     card_obj.set_pos(enemy_pos)
+    #     i = 0
+    #     while i < len(self.object_handles):
+    #         if "model_type" in self.object_handles[i].fields and self.object_handles[i].fields["model_type"] == "symbol":
+    #             self.object_handles.pop(i)
+    #         else:
+    #             i += 1
+    #     for symbol, count in card_obj.fields["symbols"].items():
+    #         for i in range(count):
+    #             symbol_obj = self.add_object(
+    #                 pygame.transform.scale(
+    #                     pygame.image.load(f"{symbol}.jpg"), (50, 50)),
+    #                 draggable=True
+    #             )
+    #             symbol_obj.set_pos(
+    #                 symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
+    #             symbol_obj.fields["model_type"] = "symbol"
 
-    def create_card(self, hero_name, card, position, visible=True):
-        card_obj = self.add_object(
-            pygame.transform.scale(pygame.image.load(
-                f"{card.name}.jpg"), (100, 150)),
-            draggable=True,
-        )
-        card_obj.fields["position"] = position
-        card_obj.fields["index"] = card.index
-        card_obj.fields["model_type"] = "hero_card"
-        card_obj.fields["hero_name"] = hero_name
-        card_obj.fields["visible"] = visible
 
-    def init_other_hero(self, other_hero):
-        other_pos = other_hero_pos[other_hero.name]
-        other_deck = self.add_object(font.render(str(len(other_hero.deck)), True, BLUE), other_hero.name + "_deck")
-        other_deck.set_pos(other_pos)
-        other_hand = self.add_object(font.render(str(len(other_hero.hand)), True, BLUE), other_hero.name + "_hand")
-        other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
-        other_discard = self.add_object(font.render(str(len(other_hero.discard)), True, BLUE), other_hero.name + "_discard")
-        other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
-        for card in other_hero.hand + other_hero.deck + other_hero.discard:
-            self.create_card(other_hero.name, card, {"area": "other_player"}, False)
+    # def create_card(self, hero_name, card, position, visible=True):
+    #     card_obj = self.add_object(
+    #         pygame.transform.scale(pygame.image.load(
+    #             f"{card.name}.jpg"), (100, 150)),
+    #         draggable=True,
+    #     )
+    #     card_obj.fields["position"] = position
+    #     card_obj.fields["index"] = card.index
+    #     card_obj.fields["model_type"] = "hero_card"
+    #     card_obj.fields["hero_name"] = hero_name
+    #     card_obj.fields["visible"] = visible
+
+    # def init_other_hero(self, other_hero):
+    #     other_pos = other_hero_pos[other_hero.name]
+    #     other_deck = self.add_object(font.render(str(len(other_hero.deck)), True, BLUE), other_hero.name + "_deck")
+    #     other_deck.set_pos(other_pos)
+    #     other_hand = self.add_object(font.render(str(len(other_hero.hand)), True, BLUE), other_hero.name + "_hand")
+    #     other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
+    #     other_discard = self.add_object(font.render(str(len(other_hero.discard)), True, BLUE), other_hero.name + "_discard")
+    #     other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
+    #     for card in other_hero.hand + other_hero.deck + other_hero.discard:
+    #         self.create_card(other_hero.name, card, {"area": "other_player"}, False)
 
     def init_objects(self):
         data = wait_for_data()
@@ -270,6 +315,7 @@ class GameState:
         self.eds = game["EnemyDeckSystem"]
         Entity.reset(**game["Entity"])
         System.reset(**game["System"])
+        # print(Entity.eindex)
         
         enemy_board = self.add_object(pygame.transform.scale(
             pygame.image.load("playing_board.jpg"), (250, 100)))
@@ -292,10 +338,9 @@ class GameState:
                         sg.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbol}.jpg"), (50, 50))
                         sg.graphic.position = symbol_pos[symbol] + pygame.Vector2(i * 50, 0)
 
+        self.hcgs = HeroCardGraphicSystem(self.hcps)
+            
         return ## TODO: implement the rest
-
-        for other_hero in [h for n, h in game.heroes.items() if n != hero_name]:
-            self.init_other_hero(other_hero)
 
         for i, card in enumerate(game.heroes[hero_name].hand):
             self.create_card(hero_name, card, {"area": "hand", "index": i})
@@ -464,7 +509,8 @@ class GameState:
 
         screen.blit(background, (0, 0))
         for e in Entity.filter("graphic"):
-            screen.blit(e.graphic.asset, e.graphic.position)
+            if e.graphic.visible:
+                screen.blit(e.graphic.asset, e.graphic.position)
         pygame.display.flip()
 
 

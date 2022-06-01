@@ -21,7 +21,7 @@ def make_hero(hero_name):
     return {
         "id": hero,
         "deck": deck,
-        "hand": [],
+        "hand": [SymbolCard({SWORD: 1}), SymbolCard({JUMP: 1}), SymbolCard({ARROW: 1})],
         "discard": [],
     }
 

@@ -13,6 +13,9 @@ def HeroCard():
     return me
 
 
+def symbols_to_name(symbols):
+    return ",".join(f"{symbol}={count}" for symbol, count in symbols.items())
+
 def SymbolCard(symbols):
     me = HeroCard()
     me.attach(Component("symbol_count"))
@@ -72,6 +75,7 @@ class HeroCardPositionSystem(System):
         self.subscribe("play_card")
         self.subscribe("draw_cards")
         self.subscribe("flip_enemy")
+        self.heroes = []
         self.hero_card = {}
         self.card_hero = {}
         self.play_area = []
@@ -79,14 +83,16 @@ class HeroCardPositionSystem(System):
         self.deck = {}
         self.discard = {}
         for hero in heroes:
+            hero_id = hero["id"].id
             hand = [c.id for c in hero["hand"]]
             deck = [c.id for c in hero["deck"]]
             discard = [c.id for c in hero["discard"]]
             all_cards = hand + deck + discard
-            self.hand[hero["id"]] = hand
-            self.deck[hero["id"]] = deck
-            self.discard[hero["id"]] = discard
-            self.hero_card[hero["id"]] = all_cards
+            self.heroes.append(hero_id)
+            self.hand[hero_id] = hand
+            self.deck[hero_id] = deck
+            self.discard[hero_id] = discard
+            self.hero_card[hero_id] = all_cards
             for card in all_cards:
                 self.card_hero[card] = hero["id"]
 
