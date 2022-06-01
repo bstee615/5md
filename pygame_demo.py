@@ -183,6 +183,7 @@ class MyObject:
 class HeroCardGraphicSystem(System):
     def __init__(self, hcps):
         super().__init__()
+        self.won = False
         self.subscribe("add_hero")
         self.subscribe("play_card")
         self.subscribe("draw_cards")
@@ -191,14 +192,15 @@ class HeroCardGraphicSystem(System):
         for card in Entity.filter("hero_card"):
             card.attach(Component("graphic"))
             card.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbols_to_name(card.symbol_count.symbols)}.jpg"), (100, 150))
+            card.graphic.rect = card.graphic.asset.get_rect()
             card.graphic.visible = False
             
         for i, card_id in enumerate(hcps.play_area):
             card = Entity.get(card_id)
             card_offset = 125
             x = card_offset * i
-            print("x", x)
-            card.graphic.position = pygame.Vector2(play_pos + pygame.Vector2(x, 0))
+            card.graphic.rect = card.graphic.asset.get_rect()
+            card.graphic.rect.x, card.graphic.rect.y = play_pos
             card.graphic.visible = True
 
         for hero_id in hcps.heroes:
@@ -213,16 +215,21 @@ class HeroCardGraphicSystem(System):
                 num_cards_in_hand = len(hcps.hand[hero_id])
                 x = ((1024 // 2) - 50 - ((space_between_cards * num_cards_in_hand) // 2) + (space_between_cards * i))
                 y = 600
-                card.graphic.position = pygame.Vector2(x, y)
+                card.graphic.rect.x = x
+                card.graphic.rect.y = y
                 card.graphic.visible = True
             player_discard = Entity()
             player_discard.attach(Component("graphic"))
             player_discard.graphic.asset = font.render(str(len(hcps.discard[hero_id])), True, BLUE)
-            player_discard.graphic.position = discard_pos
+            player_discard.graphic.rect = card.graphic.asset.get_rect()
+            player_discard.graphic.rect.x = deck_pos.x
+            player_discard.graphic.rect.y = deck_pos.y
             player_deck = Entity()
             player_deck.attach(Component("graphic"))
             player_deck.graphic.asset = font.render(str(len(hcps.deck[hero_id])), True, BLUE)
-            player_deck.graphic.position = deck_pos
+            player_deck.graphic.rect = card.graphic.asset.get_rect()
+            player_deck.graphic.rect.x = deck_pos.x
+            player_deck.graphic.rect.y = deck_pos.y
 
     
     def update(self):
@@ -230,7 +237,68 @@ class HeroCardGraphicSystem(System):
         for ev in events:
             # if ev["type"] == "draw_cards":
             pass
+        
+        mouse_pos = get_mouse_pos()
+        graphic_handles = [gh for gh in set(Entity.filter("graphic")) if gh.graphic.grabbed]
+        for gh in graphic_handles:
+            new_pos = mouse_pos - gh.graphic.grab_offset
+            gh.graphic.rect.x, gh.graphic.rect.y = new_pos
+        
+        if self.won:
+            screen.blit(win, (0, 0))
+        else:
+            screen.blit(background, (0, 0))
+            for e in Entity.filter("graphic"):
+                if e.graphic.visible:
+                    screen.blit(e.graphic.asset, e.graphic.rect)
+        pygame.display.flip()
 
+
+def get_mouse_pos():
+    return pygame.Vector2(pygame.mouse.get_pos())
+
+class InputSystem(System):
+    def __init__(self):
+        super().__init__()
+        self.left_down = False
+    
+    def update(self):
+        events = self.pending()
+        for ev in events:
+            pass
+        
+        step_events = pygame.event.get()
+        left, middle, right = pygame.mouse.get_pressed()
+        for event in step_events:
+            if event.type == pygame.QUIT:
+                print("quit")
+                close_network()
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                self.left_down = left
+                if left:
+                    mouse_pos = get_mouse_pos()
+                    handleable = set(Entity.filter("hero_card")) & set(Entity.filter("graphic"))
+                    for h in handleable:
+                        hr = h.graphic.rect
+                        if hr.collidepoint(mouse_pos):
+                            h.graphic.grab_offset = mouse_pos - pygame.Vector2(h.graphic.rect.x, h.graphic.rect.y)
+                            h.graphic.grabbed = True
+                if middle:
+                    print(pygame.mouse.get_pos())
+            if event.type == pygame.MOUSEBUTTONUP:
+                if not self.left_down:
+                    continue
+                self.left_down = left
+                
+                handleable = set(Entity.filter("hero_card")) & set(Entity.filter("graphic"))
+                grabbed = [h for h in handleable if h.graphic.grabbed]
+                for h in grabbed:
+                    handle = h.graphic
+                    handle.grabbed = False
+                    if play_rect.colliderect(handle.rect):
+                        System.inject({"type": "play_card", "card": h.id})
 
 class GameState:
     """Global game state"""
@@ -244,75 +312,10 @@ class GameState:
 
         self.hcps = None
         self.eds = None
+        self.hcgs = None
+        self.ins = None
 
         self.init_objects()
-
-    def move_card_to(self, card_obj, position):
-        if position["area"] == "hand":
-            space_between_cards = 125
-            num_cards_in_hand = len([o for o in self.object_handles if o.fields.get("position", {"area": None})["area"] == "hand"])
-            x = ((1024 // 2) - 50 - ((space_between_cards * num_cards_in_hand) // 2) + (space_between_cards * position["index"]))
-            y = 600
-            card_obj.set_pos(pygame.Vector2(x, y))
-            card_obj.fields["handle"].draggable = True
-        elif position["area"] == "play_area":
-            play_rect = self.named_objects["play_area"].fields["rect"]
-            card_offset = 125
-            left = play_rect.x + (card_offset * position["index"])
-            card_obj.set_pos(pygame.Vector2(left, play_rect.y))
-            card_obj.fields["handle"].draggable = True
-        elif position["area"] == "discard":
-            card_obj.set_pos(discard_pos)
-            card_obj.fields["handle"].draggable = False
-        elif position["area"] == "deck":
-            card_obj.set_pos(deck_pos)
-            card_obj.fields["handle"].draggable = False
-        elif position["area"] == "other_hero_hand":
-            base_pos = other_hero_pos[position["hero_name"]]
-            card_obj.set_pos(base_pos + pygame.Vector2(position["index"] * 60, 0))
-
-    # def init_enemy(self, card_obj):
-    #     card_obj.set_pos(enemy_pos)
-    #     i = 0
-    #     while i < len(self.object_handles):
-    #         if "model_type" in self.object_handles[i].fields and self.object_handles[i].fields["model_type"] == "symbol":
-    #             self.object_handles.pop(i)
-    #         else:
-    #             i += 1
-    #     for symbol, count in card_obj.fields["symbols"].items():
-    #         for i in range(count):
-    #             symbol_obj = self.add_object(
-    #                 pygame.transform.scale(
-    #                     pygame.image.load(f"{symbol}.jpg"), (50, 50)),
-    #                 draggable=True
-    #             )
-    #             symbol_obj.set_pos(
-    #                 symbol_pos[symbol] + pygame.Vector2(i * 50, 0))
-    #             symbol_obj.fields["model_type"] = "symbol"
-
-
-    # def create_card(self, hero_name, card, position, visible=True):
-    #     card_obj = self.add_object(
-    #         pygame.transform.scale(pygame.image.load(
-    #             f"{card.name}.jpg"), (100, 150)),
-    #         draggable=True,
-    #     )
-    #     card_obj.fields["position"] = position
-    #     card_obj.fields["index"] = card.index
-    #     card_obj.fields["model_type"] = "hero_card"
-    #     card_obj.fields["hero_name"] = hero_name
-    #     card_obj.fields["visible"] = visible
-
-    # def init_other_hero(self, other_hero):
-    #     other_pos = other_hero_pos[other_hero.name]
-    #     other_deck = self.add_object(font.render(str(len(other_hero.deck)), True, BLUE), other_hero.name + "_deck")
-    #     other_deck.set_pos(other_pos)
-    #     other_hand = self.add_object(font.render(str(len(other_hero.hand)), True, BLUE), other_hero.name + "_hand")
-    #     other_hand.set_pos(other_pos + pygame.Vector2(50, 0))
-    #     other_discard = self.add_object(font.render(str(len(other_hero.discard)), True, BLUE), other_hero.name + "_discard")
-    #     other_discard.set_pos(other_pos + pygame.Vector2(100, 0))
-    #     for card in other_hero.hand + other_hero.deck + other_hero.discard:
-    #         self.create_card(other_hero.name, card, {"area": "other_player"}, False)
 
     def init_objects(self):
         data = wait_for_data()
@@ -322,20 +325,15 @@ class GameState:
         self.eds = game["EnemyDeckSystem"]
         Entity.reset(**game["Entity"])
         System.reset(**game["System"])
-        # print(Entity.eindex)
-        
-        enemy_board = self.add_object(pygame.transform.scale(
-            pygame.image.load("playing_board.jpg"), (250, 100)))
-        enemy_board.set_pos(pygame.Vector2(650, 400))
-
-        self.add_object(pygame.Rect(200, 200, 400, 300), name="play_area")
+        self.ins = InputSystem()
 
         for card_id in self.eds.deck + [self.eds.boss]:
             card = Entity.get(card_id)
             if card_id == self.eds.top_enemy:
                 card.attach(Component("graphic"))
                 card.graphic.asset = pygame.transform.scale(pygame.image.load(f"{card.meta.name}.jpg"), (100, 150))
-                card.graphic.position = enemy_pos
+                card.graphic.rect = card.graphic.asset.get_rect()
+                card.graphic.rect.x, card.graphic.rect.y = enemy_pos
                 for sg in Entity.filter("symbol_graphic"):
                     sg.graphic.visible = False  # TODO: delete
                 for symbol, count in card.symbol_count.symbols.items():
@@ -343,36 +341,10 @@ class GameState:
                         sg = Entity()
                         sg.attach(Component("graphic"))
                         sg.graphic.asset = pygame.transform.scale(pygame.image.load(f"{symbol}.jpg"), (50, 50))
-                        sg.graphic.position = symbol_pos[symbol] + pygame.Vector2(i * 50, 0)
+                        sg.graphic.rect = sg.graphic.asset.get_rect()
+                        sg.graphic.rect.x, sg.graphic.rect.y = symbol_pos[symbol] + pygame.Vector2(i * 50, 0)
 
         self.hcgs = HeroCardGraphicSystem(self.hcps)
-            
-        return ## TODO: implement the rest
-
-        for i, (_, card) in enumerate(game.hero_cards_played):
-            card_obj = self.create_card(hero_name, card, {"area": "play_area", "index": i})
-            
-        self.update_card_pos()
-
-    def add_object(self, obj, name=None, **kwargs):
-        my_obj = MyObject(obj, **kwargs)
-        if name is not None:
-            self.named_objects[name] = my_obj
-        self.object_handles.append(my_obj)
-        return my_obj
-
-    def try_pickup(self):
-        for obj in self.object_handles:
-            if not("handle" in obj.fields and "rect" in obj.fields):
-                continue
-            obj_rect = obj.fields["rect"]
-            if obj_rect.collidepoint(self.mouse_pos):
-                obj_handle = obj.fields["handle"]
-                obj_handle.grab_offset = pygame.Vector2(
-                    self.mouse_pos.x - obj_rect.x, self.mouse_pos.y - obj_rect.y)
-                print("mouse", self.mouse_pos, "object",
-                      obj_rect, "offset", obj_handle.grab_offset)
-                obj_handle.grabbed = True
 
     def handle_action(self, action):
         print("handling", action)
@@ -427,66 +399,8 @@ class GameState:
         else:
             print("unhandled action", action)
 
-    def drop(self):
-        play_rect = self.named_objects["play_area"].fields["rect"]
-        for o in self.object_handles:
-            if "handle" in o.fields and "rect" in o.fields:
-                o_rect = o.fields["rect"]
-                if o.fields["handle"].grabbed:
-                    o.fields["handle"].grabbed = False
-                    if play_rect.colliderect(o_rect) and o.fields.get("position", {"area": None})["area"] == "hand":
-                        data = send_ws_command(json.dumps({
-                            "message": "play_hero_card",
-                            "hero_name": hero_name,
-                            "card_index": o.fields["index"],
-                        }))
-                        response = json.loads(data)
-                        print("result", response["result"])
-                        if response["result"] == "error":
-                            continue
-                        else:
-                            for action in response["actions"]:
-                                self.handle_action(action)
-        self.update_card_pos()
-
-    def update_mouse_pos(self):
-        self.mouse_pos.update(pygame.mouse.get_pos())
-    
-    def update_card_pos(self):
-        print("update_card_pos")
-        counts = defaultdict(int)
-        for o in self.object_handles:
-            if (p := o.fields.get("position", None)) is not None:
-                self.move_card_to(o, p)
-                counts[p["area"]] += 1
-        self.named_objects[hero_name + "_discard"].set_text(str(counts["discard"]))
-        self.named_objects[hero_name + "_deck"].set_text(str(counts["deck"]))
-
     def step(self):
         dt = self.clock.tick(framerate)
-        step_events = pygame.event.get()
-        for event in step_events:
-            if event.type == pygame.QUIT:
-                close_network()
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                left, middle, right = pygame.mouse.get_pressed()
-                if left:
-                    self.try_pickup()
-                if middle:
-                    print(pygame.mouse.get_pos())
-            if event.type == pygame.MOUSEBUTTONUP:
-                left, middle, right = pygame.mouse.get_pressed()
-                if not left:
-                    self.drop()
-        
-        if self.won:
-            screen.blit(win, (0, 0))
-            pygame.display.flip()
-            return
-
-        state.update_mouse_pos()
         
         if networking:
             if not recv_q.empty():
@@ -495,18 +409,7 @@ class GameState:
                     self.handle_action(action)
                 self.update_card_pos()
 
-        for o in self.object_handles:
-            if "handle" in o.fields:
-                if o.fields["handle"].grabbed:
-                    if "handle" in o.fields and "rect" in o.fields:
-                        o_handle = o.fields["handle"]
-                        o.set_pos(self.mouse_pos - o_handle.grab_offset)
-
-        screen.blit(background, (0, 0))
-        for e in Entity.filter("graphic"):
-            if e.graphic.visible:
-                screen.blit(e.graphic.asset, e.graphic.position)
-        pygame.display.flip()
+        System.update_all()
 
 
 if __name__ == "__main__":
@@ -537,7 +440,8 @@ if __name__ == "__main__":
 
         enemy_pos = pygame.Vector2(750, 200)
         discard_pos = pygame.Vector2(900, 600)
-        play_pos = pygame.Vector2(200, 200)
+        play_rect = pygame.Rect(200, 200, 400, 300)
+        play_pos = pygame.Vector2(play_rect.x, play_rect.y)
         deck_pos = pygame.Vector2(100, 600)
         symbol_pos = {
             SWORD: pygame.Vector2(750, 400),

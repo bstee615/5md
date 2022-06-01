@@ -2,7 +2,9 @@
     "type": "graphic",
     "schema": {
         "asset": null,
-        "position": [0, 0],
-        "visible": true
+        "rect": [0, 0, 0, 0],
+        "visible": true,
+        "grabbed": false,
+        "grab_offset": [0, 0]
     }
 }
